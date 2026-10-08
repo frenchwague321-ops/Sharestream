@@ -1,0 +1,6 @@
+{
+  "name": "ShareStream - Location de Comptes Streaming",
+  "description": "Application de partage et location de comptes streaming inspirée de GamsGo et Sharesub avec Firebase, gestion admin et support bilingue FR/EN.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

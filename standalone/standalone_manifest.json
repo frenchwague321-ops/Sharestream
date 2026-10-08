@@ -1,0 +1,21 @@
+{
+  "name": "ShareStream - Location Comptes Streaming",
+  "short_name": "ShareStream",
+  "description": "Application de partage et location de comptes Netflix, Spotify, Disney+",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0F0F0F",
+  "theme_color": "#1A1A1A",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=192&auto=format&fit=crop&q=80",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=512&auto=format&fit=crop&q=80",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

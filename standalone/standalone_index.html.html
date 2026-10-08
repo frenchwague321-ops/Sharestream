@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ShareStream - Location de Comptes Streaming</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1A1A1A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Firebase App & Services via CDN -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Supérieure -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand" onclick="navigate('home')">
+        <div class="brand-icon">📺</div>
+        <div class="brand-text">
+          <span class="brand-title">ShareStream</span>
+          <span class="brand-subtitle" id="tagline-txt">Location Streaming</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-lang" onclick="toggleLanguage()" id="lang-btn">FR / EN</button>
+        <button class="btn-primary" onclick="openAuthModal()" id="auth-btn">Connexion</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Bannière Hero -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <span class="hero-pill">✨ Offres streaming vérifiées & garanties</span>
+      <h1 class="hero-title">Vos abonnements favoris à tarif solidaire & partagé</h1>
+      <p class="hero-desc">Netflix 4K, Spotify Famille, Disney+, Prime Video avec profils privés sécurisés et activation WhatsApp immédiate.</p>
+    </div>
+  </section>
+
+  <!-- Filtres et Recherche -->
+  <section class="controls-section">
+    <div class="controls-container">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Rechercher (Netflix, Spotify, 4K...)" oninput="filterAccounts()">
+      </div>
+
+      <div class="categories-bar">
+        <button class="cat-btn active" onclick="setCategory('Tous', this)">Tous</button>
+        <button class="cat-btn" onclick="setCategory('Netflix', this)">Netflix</button>
+        <button class="cat-btn" onclick="setCategory('Spotify', this)">Spotify</button>
+        <button class="cat-btn" onclick="setCategory('Disney+', this)">Disney+</button>
+        <button class="cat-btn" onclick="setCategory('Autres', this)">Autres</button>
+      </div>
+
+      <div class="filter-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="avail-only" onchange="filterAccounts()">
+          <span id="avail-txt">Disponibles uniquement</span>
+        </label>
+        <span id="accounts-count" class="count-badge">8 comptes</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grille des Comptes -->
+  <main class="catalog-section">
+    <div class="catalog-grid" id="accounts-grid">
+      <!-- Les cartes sont injectées dynamiquement par app.js -->
+    </div>
+  </main>
+
+  <!-- Modal Détails Compte -->
+  <div class="modal-backdrop" id="detail-modal">
+    <div class="modal-card">
+      <button class="btn-close" onclick="closeModal('detail-modal')">✕</button>
+      <div class="modal-banner" id="modal-img-container">
+        <img id="modal-img" src="" alt="Abonnement">
+        <div class="modal-badge-float" id="modal-platform">Netflix</div>
+      </div>
+      <div class="modal-body">
+        <h2 id="modal-title">Netflix Premium 4K</h2>
+        <div class="modal-price-row">
+          <span class="modal-price" id="modal-price">2500 FCFA</span>
+          <span class="modal-period">/ mois</span>
+        </div>
+        <p id="modal-desc" class="modal-description"></p>
+        <div class="modal-features" id="modal-features"></div>
+        <div class="guarantee-box">
+          <span>🛡️</span>
+          <p id="guarantee-txt">Garantie 30 jours sans coupure avec support direct WhatsApp.</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-wa" onclick="contactWhatsAppCurrent()">📱 WhatsApp</button>
+          <button class="btn-reserve" id="modal-reserve-btn" onclick="reserveCurrent()">Réserver</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts Application -->
+  <script src="translations.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

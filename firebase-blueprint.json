@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and contact information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "phoneNumber": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "email", "role", "createdAt"]
+    },
+    "Account": {
+      "title": "Account",
+      "description": "Streaming account available for reservation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "platform": { "type": "string" },
+        "price": { "type": "number" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["available", "reserved"] },
+        "imageUrl": { "type": "string" },
+        "quality": { "type": "string" },
+        "profilesCount": { "type": "number" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "slotsAvailable": { "type": "number" },
+        "slotsTotal": { "type": "number" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "name", "platform", "price", "status", "createdAt"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "Streaming subscription reservations made by users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "reservedAt": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "ended"] },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "platform": { "type": "string" },
+        "price": { "type": "number" },
+        "expiresAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "accountId", "accountName", "reservedAt", "status"]
+    }
+  }
+}
