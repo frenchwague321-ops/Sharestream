@@ -457,34 +457,36 @@ function renderAccounts() {
       platform: acc.platform,
       price: (acc.price || 0).toLocaleString()
     });
-    const waUrl = `https://wa.me/221777059102?text=${encodeURIComponent(rawMsg)}`;
+    const waUrl = 'https://wa.me/221777059102?text=' + encodeURIComponent(rawMsg);
+    const displayImg = acc.imageUrl || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800';
+    const displayPrice = (acc.price || 0).toLocaleString();
+    const displayQuality = acc.quality || '4K UHD';
+    const disabledAttr = !isAvailable ? 'disabled style="opacity: 0.5;"' : '';
 
-    return `
-      <div class="card">
-        <div class="card-media">
-          <img src="${acc.imageUrl || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800'}" alt="${acc.name}" />
-          <span class="card-platform-badge">${acc.platform}</span>
-          <span class="card-status-badge ${statusClass}">${statusText}</span>
-        </div>
-        <div class="card-body">
-          <h3 class="card-title">${acc.name}</h3>
-          <p class="card-desc">${acc.description || ''}</p>
-          <div class="card-meta">
-            <div>
-              <span class="price-tag">${(acc.price || 0).toLocaleString()}</span>
-              <span class="price-suffix"> FCFA / mois</span>
-            </div>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">${acc.quality || '4K UHD'}</span>
-          </div>
-          <div class="card-actions">
-            <button class="btn-primary" onclick="window.handleReserve('${acc.id}')" ${!isAvailable ? 'disabled style="opacity: 0.5;"' : ''}>
-              ${t('reserveBtn', state.lang)}
-            </button>
-            <a href="${waUrl}" target="_blank" rel="noopener" class="btn-whatsapp">WhatsApp</a>
-          </div>
-        </div>
-      </div>
-    `;
+    return '<div class="card">' +
+      '<div class="card-media">' +
+        '<img src="' + displayImg + '" alt="' + acc.name + '" />' +
+        '<span class="card-platform-badge">' + acc.platform + '</span>' +
+        '<span class="card-status-badge ' + statusClass + '">' + statusText + '</span>' +
+      '</div>' +
+      '<div class="card-body">' +
+        '<h3 class="card-title">' + acc.name + '</h3>' +
+        '<p class="card-desc">' + (acc.description || '') + '</p>' +
+        '<div class="card-meta">' +
+          '<div>' +
+            '<span class="price-tag">' + displayPrice + '</span>' +
+            '<span class="price-suffix"> FCFA / mois</span>' +
+          '</div>' +
+          '<span style="font-size: 0.75rem; color: var(--text-muted);">' + displayQuality + '</span>' +
+        '</div>' +
+        '<div class="card-actions">' +
+          '<button class="btn-primary" onclick="window.handleReserve(\'' + acc.id + '\')" ' + disabledAttr + '>' +
+            t('reserveBtn', state.lang) +
+          '</button>' +
+          '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">WhatsApp</a>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 
@@ -493,7 +495,7 @@ window.handleReserve = async function(accountId) {
   if (!account) return;
 
   const newRes = {
-    id: `res-${Date.now()}`,
+    id: 'res-' + Date.now(),
     userId: state.currentUser.id,
     userName: state.currentUser.name,
     userEmail: state.currentUser.email,
@@ -521,15 +523,15 @@ window.handleReserve = async function(accountId) {
 function renderReservationsModal() {
   const listEl = document.getElementById('reservations-list');
   if (!listEl) return;
-  listEl.innerHTML = state.reservations.map(r => `
-    <div style="background: #1C1C24; padding: 1rem; border-radius: 12px; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
-      <div>
-        <strong>${r.accountName}</strong> (${r.platform})
-        <div style="font-size: 0.8rem; color: #9CA3AF;">${new Date(r.reservedAt).toLocaleDateString()}</div>
-      </div>
-      <div style="font-weight: 800; color: #3B82F6;">${(r.price || 0).toLocaleString()} FCFA</div>
-    </div>
-  `).join('') || '<p style="text-align: center; color: #6B7280;">Aucune réservation</p>';
+  listEl.innerHTML = state.reservations.map(r => 
+    '<div style="background: #1C1C24; padding: 1rem; border-radius: 12px; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">' +
+      '<div>' +
+        '<strong>' + r.accountName + '</strong> (' + r.platform + ')' +
+        '<div style="font-size: 0.8rem; color: #9CA3AF;">' + new Date(r.reservedAt).toLocaleDateString() + '</div>' +
+      '</div>' +
+      '<div style="font-weight: 800; color: #3B82F6;">' + (r.price || 0).toLocaleString() + ' FCFA</div>' +
+    '</div>'
+  ).join('') || '<p style="text-align: center; color: #6B7280;">Aucune réservation</p>';
 }`
   },
 
@@ -645,7 +647,7 @@ export function t(key, lang = 'fr', params = {}) {
   const dict = translations[lang] || translations.fr;
   let text = dict[key] || translations.fr[key] || key;
   Object.keys(params).forEach(p => {
-    text = text.replace(new RegExp(\`\\\\{\${p}\\\\}\`, 'g'), params[p]);
+    text = text.replace(new RegExp('\\\\{' + p + '\\\\}', 'g'), params[p]);
   });
   return text;
 }`
@@ -656,34 +658,36 @@ export function t(key, lang = 'fr', params = {}) {
     lang: 'markdown',
     path: 'README.md',
     description: "Guide étape par étape de déploiement sur Firebase Hosting, GitHub Pages et serveurs Web",
-    code: `# 🚀 ShareStream - PWA Standalone Deployment Guide
-
-## Déploiement sur Firebase Hosting (Gratuit & SSL Automatique)
-
-1. Installez les outils Firebase CLI :
-\`\`\`bash
-npm install -g firebase-tools
-\`\`\`
-
-2. Connectez-vous à votre compte Google :
-\`\`\`bash
-firebase login
-\`\`\`
-
-3. Initialisez le projet dans ce dossier :
-\`\`\`bash
-firebase init hosting
-\`\`\`
-- Sélectionnez votre projet existant : \`velvety-artifact-hpthm\`
-- Répertoire public : \`.\` (le dossier courant)
-- Single-page app : \`N\`
-- Overwrite index.html : \`N\`
-
-4. Déployez en production :
-\`\`\`bash
-firebase deploy --only hosting
-\`\`\`
-
-Votre application est immédiatement disponible en ligne avec Firestore connecté en temps réel !`
+    code: [
+      "# 🚀 ShareStream - PWA Standalone Deployment Guide",
+      "",
+      "## Déploiement sur Firebase Hosting (Gratuit & SSL Automatique)",
+      "",
+      "1. Installez les outils Firebase CLI :",
+      "```bash",
+      "npm install -g firebase-tools",
+      "```",
+      "",
+      "2. Connectez-vous à votre compte Google :",
+      "```bash",
+      "firebase login",
+      "```",
+      "",
+      "3. Initialisez le projet dans ce dossier :",
+      "```bash",
+      "firebase init hosting",
+      "```",
+      "- Sélectionnez votre projet existant : velvety-artifact-hpthm",
+      "- Répertoire public : . (le dossier courant)",
+      "- Single-page app : N",
+      "- Overwrite index.html : N",
+      "",
+      "4. Déployez en production :",
+      "```bash",
+      "firebase deploy --only hosting",
+      "```",
+      "",
+      "Votre application est immédiatement disponible en ligne avec Firestore connecté en temps réel !"
+    ].join('\n')
   }
 };
