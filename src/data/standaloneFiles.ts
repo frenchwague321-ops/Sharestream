@@ -28,114 +28,626 @@ export const STANDALONE_PWA_FILES: Record<string, StandaloneFile> = {
   <!-- Feuille de style CSS moderne -->
   <link rel="stylesheet" href="./style.css" />
 </head>
-<body>
-
-  <!-- En-tête de navigation -->
-  <header>
-    <div class="container header-content">
-      <div class="brand" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-        <div class="brand-icon">▶</div>
-        <div>
-          <span class="brand-title">ShareStream</span>
-          <span class="badge-tag">PWA Standalone</span>
-        </div>
+<body class="bg-dark text-light antialiased min-h-screen flex flex-col font-sans">
+  
+  <!-- Navigation Header -->
+  <header class="sticky top-0 z-40 backdrop-blur-md bg-dark/90 border-b border-border px-4 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/20 font-bold text-xl">
+        S
       </div>
-
-      <div class="nav-actions">
-        <div class="badge-cloud">
-          <span class="badge-cloud-dot"></span>
-          <span>Firestore Cloud</span>
-        </div>
-
-        <button id="btn-open-reservations" class="btn-icon">
-          <span>📦</span>
-          <span data-i18n="myReservations">Mes Réservations</span>
-        </button>
-
-        <div class="lang-switch">
-          <button id="btn-lang-fr" class="lang-btn active">FR</button>
-          <button id="btn-lang-en" class="lang-btn">EN</button>
-        </div>
+      <div>
+        <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">ShareStream</span>
+        <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">Standalone PWA</span>
       </div>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="flex items-center gap-3">
+      <!-- Language Switcher -->
+      <button id="langToggleBtn" class="px-3 py-1.5 rounded-xl bg-surface border border-border text-xs font-semibold text-gray-300 hover:text-white hover:border-gray-600 transition flex items-center gap-1.5">
+        <span id="currentLangLabel">FR</span>
+      </button>
+
+      <!-- PWA Install Prompt Button -->
+      <button id="pwaInstallBtn" class="hidden px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+        <span data-i18n="installApp">Installer l'application</span>
+      </button>
+
+      <!-- Admin Status / WhatsApp direct -->
+      <a href="https://wa.me/221777059102" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-600/30 transition">
+        <span>+221 77 705 91 02</span>
+      </a>
     </div>
   </header>
 
-  <!-- Contenu Principal -->
-  <main class="container">
-    <section class="hero">
-      <h1 data-i18n="appSubtitle">Location & Partage de Comptes Streaming</h1>
-      <p data-i18n="tagline">Profitez de vos abonnements premium favoris à tarif solidaire et partagé en Afrique de l'Ouest.</p>
+  <!-- Hero Section -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-6 text-center">
+    <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mb-3" data-i18n="heroTitle">
+      Vos abonnements streaming préférés au meilleur tarif
+    </h1>
+    <p class="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto mb-6" data-i18n="heroSubtitle">
+      Accédez aux services premium Netflix, Disney+, Spotify et plus avec activation rapide via WhatsApp et paiement sécurisé en FCFA.
+    </p>
 
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input 
-          id="search-input" 
-          type="text" 
-          data-i18n-placeholder="searchPlaceholder" 
-          placeholder="Rechercher une plateforme ou une offre..." 
-        />
+    <!-- Platform Filter Tabs -->
+    <div class="flex items-center justify-center gap-2 flex-wrap" id="filterTabsContainer">
+      <button class="filter-tab active" data-filter="Tous" data-i18n="filterAll">Tous</button>
+      <button class="filter-tab" data-filter="Netflix">Netflix</button>
+      <button class="filter-tab" data-filter="Spotify">Spotify</button>
+      <button class="filter-tab" data-filter="Disney+">Disney+</button>
+      <button class="filter-tab" data-filter="Autres" data-i18n="filterOthers">Autres</button>
+    </div>
+  </section>
+
+  <!-- Accounts Catalog Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+    <!-- Loading Skeleton -->
+    <div id="loadingIndicator" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="account-card skeleton h-72"></div>
+      <div class="account-card skeleton h-72"></div>
+      <div class="account-card skeleton h-72"></div>
+    </div>
+
+    <!-- Accounts Render Target -->
+    <div id="accountsGrid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+
+    <!-- Empty State -->
+    <div id="emptyCatalogState" class="hidden text-center py-16">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface flex items-center justify-center text-gray-500">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
       </div>
-
-      <div class="filter-tabs">
-        <button class="tab-btn active" data-category="all" data-i18n="allCategories">Tous</button>
-        <button class="tab-btn" data-category="netflix">Netflix</button>
-        <button class="tab-btn" data-category="spotify">Spotify</button>
-        <button class="tab-btn" data-category="disney+">Disney+</button>
-        <button class="tab-btn" data-category="youtube">YouTube</button>
-        <button class="tab-btn" data-category="prime">Prime Video</button>
-        <button class="tab-btn" data-category="chatgpt">ChatGPT</button>
-      </div>
-    </section>
-
-    <!-- Grille des Offres Firestore -->
-    <section id="catalog-grid" class="catalog-grid"></section>
+      <h3 class="text-lg font-bold text-gray-300" data-i18n="noAccountsFound">Aucun compte disponible dans cette catégorie</h3>
+      <p class="text-sm text-gray-500 mt-1" data-i18n="checkBackLater">Vérifiez un autre filtre ou contactez le support pour commander.</p>
+    </div>
   </main>
 
-  <!-- Modal Réservations Utilisateur -->
-  <div id="reservations-modal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 class="modal-title" data-i18n="myReservations">Mes Réservations</h3>
-        <button id="modal-close-btn" class="modal-close">&times;</button>
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-border bg-dark/60 py-8 px-4 text-center text-xs text-gray-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <p>&copy; <span id="currentYear"></span> ShareStream. Développé pour Moussa Wagué.</p>
       </div>
-      <div id="reservations-list"></div>
-      <div style="margin-top: 1.5rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-        <p style="font-size: 0.8rem; color: var(--text-dim);">
-          Service client WhatsApp : 
-          <a href="https://wa.me/221777059102" target="_blank" style="color: var(--color-whatsapp); font-weight: 700; text-decoration: none;">+221 77 705 91 02</a>
-        </p>
+      <div class="flex items-center gap-4 text-gray-400">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Firestore Synced</span>
+        <a href="https://wa.me/221777059102" class="hover:text-white transition">Support WhatsApp (+221 77 705 91 02)</a>
       </div>
-    </div>
-  </div>
-
-  <div id="toast-container" class="toast-container"></div>
-
-  <footer>
-    <div class="container">
-      <p>© 2026 ShareStream. PWA Pure HTML/JS/CSS/Firebase. WhatsApp : <strong>+221 77 705 91 02</strong></p>
     </div>
   </footer>
 
-  <!-- Application Logic ES Module -->
+  <!-- Scripts -->
+  <script type="module" src="./translations.js"></script>
+  <script type="module" src="./firebase-config.js"></script>
   <script type="module" src="./app.js"></script>
 </body>
 </html>`
+  },
+
+  'style.css': {
+    name: 'style.css',
+    lang: 'css',
+    path: 'style.css',
+    description: "Thème CSS autonome avec variables modernes, support responsive, cartes d'abonnement et animations",
+    code: `/* ShareStream Standalone Pure CSS Theme */
+:root {
+  --bg-dark: #0A0A0C;
+  --bg-surface: #141418;
+  --bg-surface-hover: #1A1A20;
+  --border-color: #27272F;
+  --primary-blue: #2563EB;
+  --primary-blue-hover: #1D4ED8;
+  --accent-green: #22C55E;
+  --accent-red: #EF4444;
+  --text-main: #F3F4F6;
+  --text-muted: #9CA3AF;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header & Glassmorphism */
+.backdrop-blur-md {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.bg-dark { background-color: var(--bg-dark); }
+.bg-surface { background-color: var(--bg-surface); }
+.border-border { border-color: var(--border-color); }
+
+/* Filter Tabs */
+.filter-tab {
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-tab:hover {
+  color: #fff;
+  border-color: #3f3f4e;
+}
+
+.filter-tab.active {
+  background-color: var(--primary-blue);
+  color: #fff;
+  border-color: var(--primary-blue);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+/* Account Cards */
+.account-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.account-card:hover {
+  transform: translateY(-4px);
+  border-color: #3f3f4e;
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.6);
+}
+
+.account-badge-available {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.account-badge-reserved {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.whatsapp-button {
+  background-color: #25D366;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+.whatsapp-button:hover {
+  background-color: #20bd5a;
+}
+
+.whatsapp-button:active {
+  transform: scale(0.98);
+}
+
+/* Skeleton loader */
+.skeleton {
+  background: linear-gradient(90deg, #141418 25%, #1e1e24 50%, #141418 75%);
+  background-size: 200% 100%;
+  animation: loadingPulse 1.5s infinite;
+}
+
+@keyframes loadingPulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}`
+  },
+
+  'firebase-config.js': {
+    name: 'firebase-config.js',
+    lang: 'javascript',
+    path: 'firebase-config.js',
+    description: "Configuration Firebase SDK v10 (ES Modules) connectée à Firestore pour les données temps réel",
+    code: `// Initialisation Firebase SDK Client Standalone
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+import { 
+  getFirestore, 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy,
+  doc,
+  updateDoc 
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+// Configuration Firebase ShareStream
+export const firebaseConfig = {
+  apiKey: "AIzaSyDummyKeyForTemplatePurposes9843",
+  authDomain: "velvety-artifact-hpthm.firebaseapp.com",
+  projectId: "velvety-artifact-hpthm",
+  storageBucket: "velvety-artifact-hpthm.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef123456"
+};
+
+// Initialisation
+export const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+
+export { 
+  collection, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  doc, 
+  updateDoc 
+};`
+  },
+
+  'translations.js': {
+    name: 'translations.js',
+    lang: 'javascript',
+    path: 'translations.js',
+    description: "Gestionnaire bilingue FR/EN complet avec dictionnaire de traduction pour l'interface PWA",
+    code: `// Dictionnaire Bilingue ShareStream
+export const translations = {
+  fr: {
+    heroTitle: "Vos abonnements streaming préférés au meilleur tarif",
+    heroSubtitle: "Accédez aux services premium Netflix, Disney+, Spotify et plus avec activation rapide via WhatsApp et paiement sécurisé en FCFA.",
+    filterAll: "Tous",
+    filterOthers: "Autres",
+    installApp: "Installer l'application",
+    btnWhatsApp: "Commander via WhatsApp",
+    available: "Disponible",
+    reserved: "Réservé",
+    month: "mois",
+    perMonth: "FCFA / mois",
+    noAccountsFound: "Aucun compte disponible dans cette catégorie",
+    checkBackLater: "Vérifiez un autre filtre ou contactez le support pour commander.",
+    supportNotice: "Besoin d'un compte sur-mesure ? Écrivez-nous directement."
+  },
+  en: {
+    heroTitle: "Your favorite streaming subscriptions at the best price",
+    heroSubtitle: "Get instant access to Netflix, Disney+, Spotify and more with direct WhatsApp delivery and secure FCFA payment.",
+    filterAll: "All",
+    filterOthers: "Others",
+    installApp: "Install App",
+    btnWhatsApp: "Order via WhatsApp",
+    available: "Available",
+    reserved: "Reserved",
+    month: "month",
+    perMonth: "FCFA / month",
+    noAccountsFound: "No account found in this category",
+    checkBackLater: "Try selecting another filter or contact support directly.",
+    supportNotice: "Need a custom subscription? Text us on WhatsApp."
+  }
+};
+
+let currentLanguage = localStorage.getItem('sharestream_lang') || 'fr';
+
+export function getLanguage() {
+  return currentLanguage;
+}
+
+export function setLanguage(lang) {
+  currentLanguage = lang;
+  localStorage.setItem('sharestream_lang', lang);
+  applyTranslations();
+}
+
+export function toggleLanguage() {
+  const next = currentLanguage === 'fr' ? 'en' : 'fr';
+  setLanguage(next);
+  return next;
+}
+
+export function t(key) {
+  return translations[currentLanguage][key] || key;
+}
+
+export function applyTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[currentLanguage][key]) {
+      el.textContent = translations[currentLanguage][key];
+    }
+  });
+
+  const langLabel = document.getElementById('currentLangLabel');
+  if (langLabel) {
+    langLabel.textContent = currentLanguage.toUpperCase();
+  }
+}`
+  },
+
+  'app.js': {
+    name: 'app.js',
+    lang: 'javascript',
+    path: 'app.js',
+    description: "Logique applicative JavaScript, réactivité temps réel Firestore, commandes WhatsApp",
+    code: [
+      "// Application Logic ShareStream",
+      "import { db, collection, onSnapshot, query } from './firebase-config.js';",
+      "import { t, getLanguage, toggleLanguage, applyTranslations } from './translations.js';",
+      "",
+      "// Données par défaut si Firestore est en cours de synchronisation",
+      "const DEFAULT_ACCOUNTS = [",
+      "  {",
+      "    id: 'netflix-1',",
+      "    name: 'Netflix Premium 4K UHD',",
+      "    platform: 'Netflix',",
+      "    price: 3500,",
+      "    description: 'Profil privé avec code PIN personnel, streaming 4K Ultra HD.',",
+      "    status: 'available',",
+      "    imageUrl: 'https://assets.nflxext.com/ffe/siteui/common/icons/nficon2016.ico'",
+      "  },",
+      "  {",
+      "    id: 'spotify-1',",
+      "    name: 'Spotify Premium Famille',",
+      "    platform: 'Spotify',",
+      "    price: 1500,",
+      "    description: 'Écoute sans publicité, téléchargement hors-ligne illimité.',",
+      "    status: 'available',",
+      "    imageUrl: 'https://open.spotifycdn.com/cdn/images/favicon32.b64ecc03.png'",
+      "  },",
+      "  {",
+      "    id: 'disney-1',",
+      "    name: 'Disney+ Standard avec Pubs',",
+      "    platform: 'Disney+',",
+      "    price: 2500,",
+      "    description: 'Films Marvel, Star Wars et classiques Disney en HD intégrale.',",
+      "    status: 'available',",
+      "    imageUrl: 'https://static-assets.bamgrid.com/product/disneyplus/favicons/favicon.ico'",
+      "  }",
+      "];",
+      "",
+      "let allAccounts = [];",
+      "let activeFilter = 'Tous';",
+      "let deferredPrompt = null;",
+      "",
+      "// Éléments du DOM",
+      "const accountsGrid = document.getElementById('accountsGrid');",
+      "const loadingIndicator = document.getElementById('loadingIndicator');",
+      "const emptyCatalogState = document.getElementById('emptyCatalogState');",
+      "const langToggleBtn = document.getElementById('langToggleBtn');",
+      "const pwaInstallBtn = document.getElementById('pwaInstallBtn');",
+      "const currentYearEl = document.getElementById('currentYear');",
+      "",
+      "if (currentYearEl) {",
+      "  currentYearEl.textContent = new Date().getFullYear();",
+      "}",
+      "",
+      "// Formatage des prix en FCFA",
+      "function formatPrice(amount) {",
+      "  return new Intl.NumberFormat('fr-FR').format(amount);",
+      "}",
+      "",
+      "// Génération de l'URL WhatsApp avec message pré-rempli officiel",
+      "function generateWhatsAppLink(account) {",
+      "  const phone = '221777059102';",
+      "  const rawMsg = 'Bonjour, je souhaite louer ' + account.name + ' pour ' + formatPrice(account.price) + ' FCFA/mois. Merci !';",
+      "  return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(rawMsg);",
+      "}",
+      "",
+      "// Rendu des comptes dans le DOM",
+      "function renderAccounts() {",
+      "  if (!accountsGrid) return;",
+      "",
+      "  let filtered = allAccounts;",
+      "  if (activeFilter === 'Autres') {",
+      "    filtered = allAccounts.filter(function(a) {",
+      "      return !['Netflix', 'Spotify', 'Disney+'].includes(a.platform);",
+      "    });",
+      "  } else if (activeFilter !== 'Tous') {",
+      "    filtered = allAccounts.filter(function(a) {",
+      "      return a.platform === activeFilter;",
+      "    });",
+      "  }",
+      "",
+      "  if (filtered.length === 0) {",
+      "    accountsGrid.classList.add('hidden');",
+      "    if (emptyCatalogState) emptyCatalogState.classList.remove('hidden');",
+      "    return;",
+      "  }",
+      "",
+      "  if (emptyCatalogState) emptyCatalogState.classList.add('hidden');",
+      "  accountsGrid.classList.remove('hidden');",
+      "",
+      "  accountsGrid.innerHTML = filtered.map(function(acc) {",
+      "    const isAvailable = acc.status === 'available';",
+      "    const statusClass = isAvailable ? 'account-badge-available' : 'account-badge-reserved';",
+      "    const statusLabel = isAvailable ? t('available') : t('reserved');",
+      "    const waUrl = generateWhatsAppLink(acc);",
+      "",
+      "    return [",
+      "      '<div class=\"account-card\">',",
+      "      '  <div class=\"flex items-center justify-between mb-4\">',",
+      "      '    <span class=\"text-xs font-bold tracking-wider uppercase text-gray-400\">' + acc.platform + '</span>',",
+      "      '    <span class=\"' + statusClass + '\">' + statusLabel + '</span>',",
+      "      '  </div>',",
+      "      '  <h3 class=\"text-lg font-extrabold text-white mb-2 leading-snug\">' + acc.name + '</h3>',",
+      "      '  <p class=\"text-xs text-gray-400 mb-6 flex-1\">' + (acc.description || '') + '</p>',",
+      "      '  <div class=\"pt-4 border-t border-border flex items-center justify-between mt-auto mb-4\">',",
+      "      '    <div>',",
+      "      '      <span class=\"text-xs text-gray-500 block\">Tarif mensuel</span>',",
+      "      '      <span class=\"text-xl font-black text-white\">' + formatPrice(acc.price) + ' <span class=\"text-xs font-semibold text-gray-400\">FCFA</span></span>',",
+      "      '    </div>',",
+      "      '  </div>',",
+      "      '  <a href=\"' + waUrl + '\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"whatsapp-button\">',",
+      "      '    <svg class=\"w-4 h-4 fill-white\" viewBox=\"0 0 24 24\"><path d=\"M17.472 14.382c-.301-.15-1.78-.878-2.056-.978-.276-.1-.476-.15-.677.15-.2.301-.777.978-.953 1.179-.176.2-.351.226-.652.075-.301-.15-1.272-.469-2.423-1.496-.895-.799-1.5-1.787-1.676-2.088-.176-.301-.019-.464.132-.614.136-.135.301-.351.452-.527.15-.176.2-.301.301-.502.101-.2.05-.376-.025-.526-.075-.15-.677-1.631-.928-2.233-.244-.587-.492-.507-.676-.516h-.577c-.2 0-.527.075-.803.376-.276.301-1.054 1.029-1.054 2.509 0 1.48 1.079 2.909 1.23 3.11 0.15 0.201 2.122 3.24 5.141 4.544.718.31 1.279.496 1.716.635.722.23 1.38.197 1.9.12.58-.087 1.78-.727 2.03-1.43.25-.702.25-1.304.175-1.43-.075-.125-.276-.2-.577-.35z\"/></svg>',",
+      "      '    <span>' + t('btnWhatsApp') + '</span>',",
+      "      '  </a>',",
+      "      '</div>'",
+      "    ].join('\\n');",
+      "  }).join('');",
+      "}",
+      "",
+      "// Chargement et écoute en temps réel Firestore",
+      "function initDataListener() {",
+      "  try {",
+      "    const q = collection(db, 'accounts');",
+      "    onSnapshot(q, function(snapshot) {",
+      "      if (!snapshot.empty) {",
+      "        allAccounts = snapshot.docs.map(function(doc) {",
+      "          return Object.assign({ id: doc.id }, doc.data());",
+      "        });",
+      "      } else {",
+      "        allAccounts = DEFAULT_ACCOUNTS;",
+      "      }",
+      "      if (loadingIndicator) loadingIndicator.classList.add('hidden');",
+      "      renderAccounts();",
+      "    }, function(err) {",
+      "      console.warn('Utilisation des données locales (hors-ligne ou auth):', err);",
+      "      allAccounts = DEFAULT_ACCOUNTS;",
+      "      if (loadingIndicator) loadingIndicator.classList.add('hidden');",
+      "      renderAccounts();",
+      "    });",
+      "  } catch (e) {",
+      "    console.warn('Fallback offline:', e);",
+      "    allAccounts = DEFAULT_ACCOUNTS;",
+      "    if (loadingIndicator) loadingIndicator.classList.add('hidden');",
+      "    renderAccounts();",
+      "  }",
+      "}",
+      "",
+      "// Gestion des filtres",
+      "document.querySelectorAll('.filter-tab').forEach(function(btn) {",
+      "  btn.addEventListener('click', function() {",
+      "    document.querySelectorAll('.filter-tab').forEach(function(b) { b.classList.remove('active'); });",
+      "    btn.classList.add('active');",
+      "    activeFilter = btn.getAttribute('data-filter') || 'Tous';",
+      "    renderAccounts();",
+      "  });",
+      "});",
+      "",
+      "// Changement de langue",
+      "if (langToggleBtn) {",
+      "  langToggleBtn.addEventListener('click', function() {",
+      "    toggleLanguage();",
+      "    renderAccounts();",
+      "  });",
+      "}",
+      "",
+      "// Support PWA Installation",
+      "window.addEventListener('beforeinstallprompt', function(e) {",
+      "  e.preventDefault();",
+      "  deferredPrompt = e;",
+      "  if (pwaInstallBtn) pwaInstallBtn.classList.remove('hidden');",
+      "});",
+      "",
+      "if (pwaInstallBtn) {",
+      "  pwaInstallBtn.addEventListener('click', function() {",
+      "    if (!deferredPrompt) return;",
+      "    deferredPrompt.prompt();",
+      "    deferredPrompt.userChoice.then(function() {",
+      "      pwaInstallBtn.classList.add('hidden');",
+      "      deferredPrompt = null;",
+      "    });",
+      "  });",
+      "}",
+      "",
+      "// Enregistrement du Service Worker",
+      "if ('serviceWorker' in navigator) {",
+      "  window.addEventListener('load', function() {",
+      "    navigator.serviceWorker.register('./sw.js').catch(function(err) {",
+      "      console.warn('Service Worker registration skipped:', err);",
+      "    });",
+      "  });",
+      "}",
+      "",
+      "// Initialisation globale",
+      "applyTranslations();",
+      "initDataListener();"
+    ].join('\n')
+  },
+
+  'sw.js': {
+    name: 'sw.js',
+    lang: 'javascript',
+    path: 'sw.js',
+    description: "Service Worker PWA avec stratégie Cache-First pour les assets et Network-First pour Firestore",
+    code: `const CACHE_NAME = 'sharestream-standalone-v1';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './style.css',
+  './app.js',
+  './translations.js',
+  './firebase-config.js',
+  './manifest.json',
+  '/icon.svg',
+  '/apple-touch-icon.png'
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      );
+    })
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+
+  e.respondWith(
+    caches.match(e.request).then((cachedResponse) => {
+      if (cachedResponse) return cachedResponse;
+      return fetch(e.request).catch(() => caches.match('./index.html'));
+    })
+  );
+});`
   },
 
   'manifest.json': {
     name: 'manifest.json',
     lang: 'json',
     path: 'manifest.json',
-    description: "Manifeste Web App standard pour installation sur l'écran d'accueil Android et iOS",
+    description: "Manifest PWA pour l'installation sur smartphones Android, tablettes et PC",
     code: `{
-  "name": "ShareStream - Location de Comptes Streaming",
+  "name": "ShareStream - Location Comptes Streaming",
   "short_name": "ShareStream",
-  "description": "Plateforme solidaire de partage et location de comptes streaming premium en FCFA",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#0F0F12",
+  "background_color": "#0A0A0C",
   "theme_color": "#0F0F12",
+  "description": "Location d'abonnements streaming vérifiés Netflix, Spotify, Disney+ au meilleur prix en FCFA.",
   "icons": [
     {
       "src": "/pwa-192x192.png",
@@ -145,511 +657,14 @@ export const STANDALONE_PWA_FILES: Record<string, StandaloneFile> = {
     {
       "src": "/pwa-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
     }
-  ],
-  "categories": ["entertainment", "utilities", "shopping"]
-}`
-  },
-
-  'service-worker.js': {
-    name: 'service-worker.js',
-    lang: 'javascript',
-    path: 'service-worker.js',
-    description: "Worker de cache hors-ligne avec stratégie Network-First et fallback automatique",
-    code: `// Service Worker PWA pour ShareStream
-const CACHE_NAME = 'sharestream-cache-v1';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './style.css',
-  './app.js',
-  './translations.js',
-  './firebase-config.js',
-  './manifest.json',
-  '/pwa-192x192.png',
-  '/pwa-512x512.png'
-];
-
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW Standalone] Mise en cache des ressources');
-      return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('firestore.googleapis.com')) {
-    return;
-  }
-
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
-  );
-});`
-  },
-
-  'firebase-config.js': {
-    name: 'firebase-config.js',
-    lang: 'javascript',
-    path: 'firebase-config.js',
-    description: "Configuration officielle Firebase v10 et connexion Cloud Firestore",
-    code: `// Firebase Configuration pour ShareStream PWA (Firestore + Authentication)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDocs, 
-  onSnapshot, 
-  setDoc, 
-  updateDoc,
-  query,
-  orderBy 
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-
-export const firebaseConfig = {
-  apiKey: "AIzaSyAMseI4KUxanP8C_u91t3dNJg4D5DDj19M",
-  authDomain: "sharestream-2f374.firebaseapp.com",
-  projectId: "sharestream-2f374",
-  storageBucket: "sharestream-2f374.firebasestorage.app",
-  messagingSenderId: "33094694566",
-  appId: "1:33094694566:web:47bb1b90db244fc6d3a667",
-  measurementId: "G-Y516R9GBC3"
-};
-
-// Initialisation de l'application Firebase
-export const app = initializeApp(firebaseConfig);
-
-// Base de données Firestore (Pas de Realtime Database)
-export const db = getFirestore(app);
-
-// Authentication Firebase
-export const auth = getAuth(app);
-
-export { 
-  collection, 
-  doc, 
-  getDocs, 
-  onSnapshot, 
-  setDoc, 
-  updateDoc, 
-  query, 
-  orderBy,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged
-};`
-  },
-
-  'app.js': {
-    name: 'app.js',
-    lang: 'javascript',
-    path: 'app.js',
-    description: "Logique applicative JavaScript, réactivité temps réel Firestore, commandes WhatsApp",
-    code: `// Application Logic ShareStream
-import { db, collection, doc, onSnapshot, setDoc, updateDoc } from './firebase-config.js';
-import { translations, t } from './translations.js';
-
-const FALLBACK_ACCOUNTS = [
-  {
-    id: "acc-1",
-    name: "Netflix Premium 4K",
-    platform: "Netflix",
-    price: 2500,
-    status: "available",
-    description: "Accès profil privé Ultra HD 4K avec audio spatial.",
-    imageUrl: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800",
-    quality: "4K HDR"
-  },
-  {
-    id: "acc-2",
-    name: "Spotify Famille Individuel",
-    platform: "Spotify",
-    price: 1500,
-    status: "available",
-    description: "Musique illimitée sans pub, son très haute fidélité.",
-    imageUrl: "https://images.unsplash.com/photo-1614680376593-902f749f7ffc?w=800",
-    quality: "Lossless"
-  },
-  {
-    id: "acc-3",
-    name: "Disney+ Privilège",
-    platform: "Disney+",
-    price: 2000,
-    status: "available",
-    description: "Marvel, Star Wars, Pixar, Disney en streaming 4K.",
-    imageUrl: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800",
-    quality: "4K UHD"
-  }
-];
-
-const state = {
-  lang: localStorage.getItem('sharestream_lang') || 'fr',
-  currentCategory: 'all',
-  searchQuery: '',
-  accounts: FALLBACK_ACCOUNTS,
-  reservations: [],
-  currentUser: {
-    id: "uid_firebase",
-    name: "Jean Dupont",
-    email: "jean@email.com"
-  }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-  initServiceWorker();
-  initLanguageSwitcher();
-  initSearchAndFilters();
-  initFirestoreLiveSync();
-  initModalListeners();
-  renderApp();
-});
-
-function initServiceWorker() {
-  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js')
-        .then((reg) => console.log('[PWA] SW actif:', reg.scope))
-        .catch((err) => console.warn('[PWA] SW:', err));
-    });
-  }
-}
-
-function initFirestoreLiveSync() {
-  try {
-    const accountsCol = collection(db, 'accounts');
-    onSnapshot(accountsCol, (snapshot) => {
-      if (!snapshot.empty) {
-        const loaded = [];
-        snapshot.forEach((docSnap) => loaded.push({ id: docSnap.id, ...docSnap.data() }));
-        state.accounts = loaded;
-        renderAccounts();
-      }
-    });
-
-    const reservationsCol = collection(db, 'reservations');
-    onSnapshot(reservationsCol, (snapshot) => {
-      if (!snapshot.empty) {
-        const loaded = [];
-        snapshot.forEach((docSnap) => loaded.push({ id: docSnap.id, ...docSnap.data() }));
-        state.reservations = loaded;
-        renderReservationsModal();
-      }
-    });
-  } catch (err) {
-    console.warn('[Firestore] Sync offline');
-  }
-}
-
-function initLanguageSwitcher() {
-  const btnFr = document.getElementById('btn-lang-fr');
-  const btnEn = document.getElementById('btn-lang-en');
-
-  btnFr?.addEventListener('click', () => {
-    state.lang = 'fr';
-    localStorage.setItem('sharestream_lang', 'fr');
-    btnFr.classList.add('active');
-    btnEn?.classList.remove('active');
-    renderApp();
-  });
-
-  btnEn?.addEventListener('click', () => {
-    state.lang = 'en';
-    localStorage.setItem('sharestream_lang', 'en');
-    btnEn.classList.add('active');
-    btnFr?.classList.remove('active');
-    renderApp();
-  });
-}
-
-function initSearchAndFilters() {
-  document.getElementById('search-input')?.addEventListener('input', (e) => {
-    state.searchQuery = e.target.value.toLowerCase().trim();
-    renderAccounts();
-  });
-
-  document.querySelectorAll('.tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.currentCategory = btn.getAttribute('data-category') || 'all';
-      renderAccounts();
-    });
-  });
-}
-
-function initModalListeners() {
-  const modal = document.getElementById('reservations-modal');
-  document.getElementById('btn-open-reservations')?.addEventListener('click', () => {
-    modal?.classList.add('active');
-    renderReservationsModal();
-  });
-  document.getElementById('modal-close-btn')?.addEventListener('click', () => {
-    modal?.classList.remove('active');
-  });
-}
-
-function renderApp() {
-  document.querySelectorAll('[data-i18n]').forEach((el) => {
-    el.textContent = t(el.getAttribute('data-i18n'), state.lang);
-  });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
-    el.placeholder = t(el.getAttribute('data-i18n-placeholder'), state.lang);
-  });
-  renderAccounts();
-}
-
-function renderAccounts() {
-  const grid = document.getElementById('catalog-grid');
-  if (!grid) return;
-
-  const filtered = state.accounts.filter((acc) => {
-    const matchCategory = state.currentCategory === 'all' || 
-      acc.platform.toLowerCase() === state.currentCategory.toLowerCase();
-    const matchSearch = !state.searchQuery || 
-      acc.name.toLowerCase().includes(state.searchQuery) || 
-      acc.platform.toLowerCase().includes(state.searchQuery);
-    return matchCategory && matchSearch;
-  });
-
-  grid.innerHTML = filtered.map((acc) => {
-    const isAvailable = acc.status !== 'reserved';
-    const statusText = isAvailable ? t('available', state.lang) : t('reserved', state.lang);
-    const statusClass = isAvailable ? 'status-available' : 'status-reserved';
-    const rawMsg = t('whatsappOrderMessage', state.lang, {
-      name: acc.name,
-      platform: acc.platform,
-      price: (acc.price || 0).toLocaleString()
-    });
-    const waUrl = 'https://wa.me/221777059102?text=' + encodeURIComponent(rawMsg);
-    const displayImg = acc.imageUrl || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800';
-    const displayPrice = (acc.price || 0).toLocaleString();
-    const displayQuality = acc.quality || '4K UHD';
-    const disabledAttr = !isAvailable ? 'disabled style="opacity: 0.5;"' : '';
-
-    return '<div class="card">' +
-      '<div class="card-media">' +
-        '<img src="' + displayImg + '" alt="' + acc.name + '" />' +
-        '<span class="card-platform-badge">' + acc.platform + '</span>' +
-        '<span class="card-status-badge ' + statusClass + '">' + statusText + '</span>' +
-      '</div>' +
-      '<div class="card-body">' +
-        '<h3 class="card-title">' + acc.name + '</h3>' +
-        '<p class="card-desc">' + (acc.description || '') + '</p>' +
-        '<div class="card-meta">' +
-          '<div>' +
-            '<span class="price-tag">' + displayPrice + '</span>' +
-            '<span class="price-suffix"> FCFA / mois</span>' +
-          '</div>' +
-          '<span style="font-size: 0.75rem; color: var(--text-muted);">' + displayQuality + '</span>' +
-        '</div>' +
-        '<div class="card-actions">' +
-          '<button class="btn-primary" onclick="window.handleReserve(\'' + acc.id + '\')" ' + disabledAttr + '>' +
-            t('reserveBtn', state.lang) +
-          '</button>' +
-          '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">WhatsApp</a>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-  }).join('');
-}
-
-window.handleReserve = async function(accountId) {
-  const account = state.accounts.find(a => a.id === accountId);
-  if (!account) return;
-
-  const newRes = {
-    id: 'res-' + Date.now(),
-    userId: state.currentUser.id,
-    userName: state.currentUser.name,
-    userEmail: state.currentUser.email,
-    accountId: account.id,
-    accountName: account.name,
-    platform: account.platform,
-    price: account.price,
-    reservedAt: Date.now(),
-    status: 'active'
-  };
-
-  try {
-    await setDoc(doc(db, 'reservations', newRes.id), newRes);
-    await updateDoc(doc(db, 'accounts', account.id), { status: 'reserved' });
-  } catch (e) {
-    console.warn('Backup local');
-  }
-
-  state.reservations.unshift(newRes);
-  account.status = 'reserved';
-  renderAccounts();
-  alert('Réservation effectuée avec succès !');
-};
-
-function renderReservationsModal() {
-  const listEl = document.getElementById('reservations-list');
-  if (!listEl) return;
-  listEl.innerHTML = state.reservations.map(r => 
-    '<div style="background: #1C1C24; padding: 1rem; border-radius: 12px; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">' +
-      '<div>' +
-        '<strong>' + r.accountName + '</strong> (' + r.platform + ')' +
-        '<div style="font-size: 0.8rem; color: #9CA3AF;">' + new Date(r.reservedAt).toLocaleDateString() + '</div>' +
-      '</div>' +
-      '<div style="font-weight: 800; color: #3B82F6;">' + (r.price || 0).toLocaleString() + ' FCFA</div>' +
-    '</div>'
-  ).join('') || '<p style="text-align: center; color: #6B7280;">Aucune réservation</p>';
-}`
-  },
-
-  'style.css': {
-    name: 'style.css',
-    lang: 'css',
-    path: 'style.css',
-    description: "Design system CSS moderne avec variables, thème sombre et composants interactifs",
-    code: `:root {
-  --bg-main: #0F0F12;
-  --bg-card: #16161D;
-  --color-primary: #3B82F6;
-  --color-primary-hover: #2563EB;
-  --color-success: #10B981;
-  --color-whatsapp: #25D366;
-  --text-main: #FFFFFF;
-  --text-muted: #9CA3AF;
-  --text-dim: #6B7280;
-  --border-color: rgba(255, 255, 255, 0.08);
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background-color: var(--bg-main); color: var(--text-main); font-family: system-ui, sans-serif; min-height: 100vh; }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 1.25rem; }
-header { position: sticky; top: 0; z-index: 50; background: rgba(15, 15, 18, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-color); }
-.header-content { display: flex; align-items: center; justify-content: space-between; height: 4.25rem; }
-.brand { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
-.brand-icon { width: 2.5rem; height: 2.5rem; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--color-primary); }
-.brand-title { font-size: 1.25rem; font-weight: 800; color: var(--color-primary); }
-.badge-tag { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 6px; background: rgba(59, 130, 246, 0.15); color: var(--color-primary); margin-left: 0.5rem; }
-.badge-cloud { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 6px; background: rgba(16, 185, 129, 0.15); color: var(--color-success); }
-.badge-cloud-dot { width: 6px; height: 6px; border-radius: 50%; background-color: var(--color-success); }
-.nav-actions { display: flex; align-items: center; gap: 0.75rem; }
-.lang-switch { display: flex; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); border-radius: 9999px; padding: 3px; }
-.lang-btn { background: none; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 9999px; cursor: pointer; }
-.lang-btn.active { background: #374151; color: #FFF; }
-.btn-icon { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main); padding: 0.5rem 0.85rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; }
-.hero { padding: 3rem 0 2rem 0; text-align: center; }
-.hero h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 0.75rem; }
-.hero p { color: var(--text-muted); font-size: 1rem; max-width: 600px; margin: 0 auto 1.75rem auto; }
-.search-box { position: relative; max-width: 540px; margin: 0 auto 1.5rem auto; }
-.search-box input { width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); padding: 0.85rem 1.25rem 0.85rem 3rem; border-radius: 12px; color: #FFF; font-size: 0.95rem; outline: none; }
-.search-box .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-dim); }
-.filter-tabs { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2.5rem; }
-.tab-btn { background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 9999px; cursor: pointer; }
-.tab-btn.active { background: var(--color-primary); color: #FFF; border-color: var(--color-primary); }
-.catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 4rem; }
-.card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; transition: transform 0.2s ease; }
-.card:hover { transform: translateY(-4px); }
-.card-media { position: relative; height: 160px; background: #000; }
-.card-media img { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; }
-.card-platform-badge { position: absolute; top: 0.75rem; left: 0.75rem; background: rgba(0, 0, 0, 0.75); color: #FFF; font-size: 0.75rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 6px; }
-.card-status-badge { position: absolute; top: 0.75rem; right: 0.75rem; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.6rem; border-radius: 6px; }
-.status-available { background: rgba(16, 185, 129, 0.9); color: #FFF; }
-.status-reserved { background: rgba(239, 68, 68, 0.9); color: #FFF; }
-.card-body { padding: 1.25rem; display: flex; flex-direction: column; flex: 1; }
-.card-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
-.card-desc { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; flex: 1; }
-.card-meta { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem; }
-.price-tag { font-size: 1.35rem; font-weight: 800; color: var(--color-primary); }
-.price-suffix { font-size: 0.8rem; font-weight: 500; color: var(--text-muted); }
-.card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
-.btn-primary { background: var(--color-primary); color: #FFF; border: none; font-weight: 700; font-size: 0.85rem; padding: 0.7rem; border-radius: 12px; cursor: pointer; text-align: center; }
-.btn-whatsapp { background: var(--color-whatsapp); color: #FFF; border: none; font-weight: 700; font-size: 0.85rem; padding: 0.7rem; border-radius: 12px; cursor: pointer; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; }
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(6px); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
-.modal-overlay.active { display: flex; }
-.modal-content { background: #13131A; border: 1px solid var(--border-color); border-radius: 20px; max-width: 520px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 1.5rem; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; }
-.modal-title { font-size: 1.2rem; font-weight: 700; }
-.modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
-footer { border-top: 1px solid var(--border-color); padding: 2rem 0; text-align: center; color: var(--text-dim); font-size: 0.85rem; }`
-  },
-
-  'translations.js': {
-    name: 'translations.js',
-    lang: 'javascript',
-    path: 'translations.js',
-    description: "Dictionnaire bilingue Français / Anglais complet avec interpolation de variables",
-    code: `export const translations = {
-  fr: {
-    appName: "ShareStream",
-    appSubtitle: "Location & Partage de Comptes Streaming",
-    tagline: "Profitez de vos abonnements premium favoris à tarif solidaire et partagé.",
-    searchPlaceholder: "Rechercher une plateforme ou une offre...",
-    allCategories: "Tous",
-    available: "Disponible",
-    reserved: "Réservé / Loué",
-    reserveBtn: "Réserver",
-    whatsappBtn: "WhatsApp",
-    myReservations: "Mes Réservations",
-    noReservations: "Aucune réservation pour l'instant.",
-    currency: "FCFA",
-    whatsappOrderMessage: "Bonjour, je souhaite louer le compte {name} ({platform}) à {price} FCFA/mois. Merci !"
-  },
-  en: {
-    appName: "ShareStream",
-    appSubtitle: "Streaming Accounts Sharing & Rental",
-    tagline: "Enjoy your favorite premium streaming subscriptions at shared, affordable rates.",
-    searchPlaceholder: "Search by platform or account...",
-    allCategories: "All",
-    available: "Available",
-    reserved: "Reserved / Rented",
-    reserveBtn: "Rent now",
-    whatsappBtn: "WhatsApp",
-    myReservations: "My Reservations",
-    noReservations: "No reservations yet.",
-    currency: "FCFA",
-    whatsappOrderMessage: "Hello, I would like to rent the {name} ({platform}) account for {price} FCFA/month. Thank you!"
-  }
-};
-
-export function t(key, lang = 'fr', params = {}) {
-  const dict = translations[lang] || translations.fr;
-  let text = dict[key] || translations.fr[key] || key;
-  Object.keys(params).forEach(p => {
-    text = text.replace(new RegExp('\\\\{' + p + '\\\\}', 'g'), params[p]);
-  });
-  return text;
+  ]
 }`
   },
 
@@ -657,13 +672,24 @@ export function t(key, lang = 'fr', params = {}) {
     name: 'README.md',
     lang: 'markdown',
     path: 'README.md',
-    description: "Guide étape par étape de déploiement sur Firebase Hosting, GitHub Pages et serveurs Web",
+    description: "Guide de déploiement en 1 clic sur Firebase Hosting avec index.html et SDK v10",
     code: [
-      "# 🚀 ShareStream - PWA Standalone Deployment Guide",
+      "# 🚀 Déploiement Standalone ShareStream",
       "",
-      "## Déploiement sur Firebase Hosting (Gratuit & SSL Automatique)",
+      "Ce sous-dossier contient la version **100% autonome (Zero-Build-Tool)** de ShareStream.",
+      "Elle n'a besoin ni de Node.js, ni de Vite pour fonctionner en production.",
       "",
-      "1. Installez les outils Firebase CLI :",
+      "## 📦 Fichiers inclus",
+      "- `index.html` : Interface complète responsive",
+      "- `style.css` : Thème sombre avec variables CSS",
+      "- `firebase-config.js` : SDK Firebase v10 sans bundler",
+      "- `translations.js` : Système bilingue FR/EN",
+      "- `app.js` : Logique Firestore & commandes WhatsApp",
+      "- `sw.js` : Service Worker pour le cache hors-ligne",
+      "- `manifest.json` : Installation PWA",
+      "",
+      "## ⚡ Déploiement Firebase Hosting en 3 minutes",
+      "1. Installez les outils Firebase :",
       "```bash",
       "npm install -g firebase-tools",
       "```",
@@ -691,3 +717,6 @@ export function t(key, lang = 'fr', params = {}) {
     ].join('\n')
   }
 };
+
+// Alias de compatibilité
+export const STANDALONE_FILES = STANDALONE_PWA_FILES;
