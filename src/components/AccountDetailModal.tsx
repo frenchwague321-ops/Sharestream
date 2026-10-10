@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Account } from '../types';
 import { useApp } from '../context/AppContext';
 import { PLATFORM_PRESETS } from '../data/initialData';
@@ -11,7 +11,6 @@ import {
   Zap, 
   Users, 
   Sparkles, 
-  Clock, 
   Copy, 
   Check, 
   Phone,
@@ -20,10 +19,15 @@ import {
 
 interface AccountDetailModalProps {
   account: Account | null;
+  isOpen?: boolean;
   onClose: () => void;
 }
 
-export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account, onClose }) => {
+export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ 
+  account, 
+  isOpen = true, 
+  onClose 
+}) => {
   const { 
     t, 
     language, 
@@ -35,7 +39,20 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
 
   const [copiedMessage, setCopiedMessage] = useState(false);
 
-  if (!account) return null;
+  // Close on Escape key press
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen && account) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, account, onClose]);
+
+  if (!isOpen || !account) return null;
 
   const isReserved = account.status === 'reserved';
   const platformPreset = PLATFORM_PRESETS.find(
@@ -63,16 +80,25 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6 animate-fadeIn">
+    <div 
+      className="fixed inset-0 z-[9999] overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 md:p-6 animate-fadeIn"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-account-title"
+    >
       {/* Modal Container */}
       <div 
         id="account-detail-modal"
-        className="relative w-full max-w-2xl bg-[#0F0F12] border border-gray-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl bg-[#0F0F12] border border-gray-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] z-10"
       >
         {/* Close Button */}
         <button
           id="close-detail-modal-btn"
+          type="button"
           onClick={onClose}
+          aria-label="Fermer la fenêtre de détail"
           className="absolute top-4 right-4 z-20 p-2 rounded-full bg-[#0A0A0C]/80 hover:bg-black text-gray-300 hover:text-white border border-gray-700 backdrop-blur-md transition-transform active:scale-90"
         >
           <X className="w-5 h-5" />
@@ -108,7 +134,10 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
                 <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 mb-1 block">
                   {account.platform} Official Subscription
                 </span>
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight font-['Outfit']">
+                <h1 
+                  id="modal-account-title"
+                  className="text-xl sm:text-2xl font-bold text-white tracking-tight font-['Outfit']"
+                >
                   {account.name}
                 </h1>
               </div>
@@ -202,6 +231,7 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
                   <span>Message WhatsApp pré-rempli</span>
                 </div>
                 <button
+                  type="button"
                   onClick={handleCopyWhatsAppMessage}
                   className="flex items-center gap-1 text-[11px] text-green-300 hover:text-green-200 bg-green-900/40 hover:bg-green-900/60 px-2.5 py-1 rounded-lg transition-colors"
                 >
@@ -235,6 +265,7 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
           
           <button
             id="back-to-home-modal-btn"
+            type="button"
             onClick={onClose}
             className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 hover:text-white text-sm font-semibold border border-gray-800 transition-colors order-2 sm:order-1 flex items-center justify-center gap-2"
           >
@@ -247,6 +278,7 @@ export const AccountDetailModal: React.FC<AccountDetailModalProps> = ({ account,
             {/* Instant Reserve Button */}
             <button
               id="reserve-modal-btn"
+              type="button"
               onClick={handleReserve}
               disabled={isReserved}
               className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${

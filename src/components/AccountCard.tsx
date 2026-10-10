@@ -2,7 +2,7 @@ import React from 'react';
 import { Account } from '../types';
 import { useApp } from '../context/AppContext';
 import { PLATFORM_PRESETS } from '../data/initialData';
-import { MessageCircle, CheckCircle2, Lock, ArrowRight, ShieldAlert, Sparkles, Users } from 'lucide-react';
+import { MessageCircle, CheckCircle2, Lock, ArrowRight, Sparkles, Users } from 'lucide-react';
 
 interface AccountCardProps {
   account: Account;
@@ -20,6 +20,15 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
   const badgeColor = platformPreset?.badgeColor || 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
   const displayImage = account.imageUrl || platformPreset?.logo || 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800&auto=format&fit=crop&q=80';
 
+  const handleCardClick = () => {
+    onSelect(account);
+  };
+
+  const handleDetailsClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSelect(account);
+  };
+
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     const url = generateWhatsAppLink(account);
@@ -29,8 +38,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
   return (
     <div
       id={`account-card-${account.id}`}
-      onClick={() => onSelect(account)}
-      className={`group relative rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col ${
+      onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(account);
+        }
+      }}
+      className={`group relative rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col select-none ${
         isReserved
           ? 'bg-[#16161D] border-gray-800 opacity-60 grayscale hover:opacity-80'
           : 'bg-[#16161D] border-gray-800 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5'
@@ -136,9 +153,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
             {/* Direct WhatsApp trigger */}
             <button
               id={`whatsapp-btn-${account.id}`}
+              type="button"
               onClick={handleWhatsAppClick}
               title="Contacter sur WhatsApp"
-              className="p-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-colors shadow-sm"
+              className="p-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-colors shadow-sm active:scale-95"
             >
               <MessageCircle className="w-4 h-4" />
             </button>
@@ -146,8 +164,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
             {/* View Details */}
             <button
               id={`view-detail-btn-${account.id}`}
-              onClick={() => onSelect(account)}
-              className="px-3 py-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-semibold rounded-lg flex items-center gap-1 border border-blue-500/20 hover:border-blue-500 transition-all duration-200"
+              type="button"
+              onClick={handleDetailsClick}
+              className="px-3 py-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-semibold rounded-lg flex items-center gap-1 border border-blue-500/20 hover:border-blue-500 transition-all duration-200 active:scale-95"
             >
               <span>{t('viewDetails')}</span>
               <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
