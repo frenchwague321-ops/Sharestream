@@ -1,39 +1,92 @@
-import React from 'react';
-import { useApp } from '../context/AppContext';
-import { Smartphone, RotateCcw, Sparkles } from 'lucide-react';
+import React, { ReactNode, useState, useEffect } from 'react';
+import { Wifi, BatteryMedium, Signal, Smartphone } from 'lucide-react';
 
-export const MobileFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { setMobileFrameMode } = useApp();
+interface MobileFrameProps {
+  children: ReactNode;
+}
+
+export const MobileFrame: React.FC<MobileFrameProps> = ({ children }) => {
+  // Détection mobile : écran <= 768px ou appareil mobile (Android / iOS)
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent
+    );
+    return mediaQuery.matches || isMobileUA;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const checkMobile = () => {
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+      setIsMobile(mediaQuery.matches || isMobileUA);
+    };
+
+    checkMobile();
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', checkMobile);
+      return () => mediaQuery.removeEventListener('change', checkMobile);
+    } else {
+      mediaQuery.addListener(checkMobile);
+      return () => mediaQuery.removeListener(checkMobile);
+    }
+  }, []);
+
+  // Si on est sur un appareil mobile ou petit écran, on affiche l'application directement en plein écran (sans cadre)
+  if (isMobile) {
+    return <>{children}</>;
+  }
+
+  const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="py-6 flex flex-col items-center justify-center min-h-[85vh] animate-fadeIn px-2">
-      <div className="mb-4 flex items-center gap-3 bg-gray-900/80 px-4 py-1.5 rounded-full border border-gray-800 text-xs text-gray-300">
-        <Smartphone className="w-4 h-4 text-blue-400" />
-        <span>Aperçu Simulateur Smartphone Android (1080x2400)</span>
-        <button
-          onClick={() => setMobileFrameMode(false)}
-          className="text-xs text-blue-400 hover:text-blue-300 underline ml-2"
-        >
-          Plein écran
-        </button>
-      </div>
-
-      <div className="relative w-full max-w-[400px] h-[780px] bg-[#000000] rounded-[48px] p-3.5 shadow-2xl shadow-blue-950/30 border-4 border-gray-800 flex flex-col overflow-hidden ring-1 ring-white/10">
+    <div className="py-6 px-4 flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] bg-[#0A0A0C]">
+      
+      {/* Device wrapper */}
+      <div className="relative w-full max-w-[420px] h-[850px] bg-[#0A0A0C] rounded-[48px] border-[10px] border-gray-800 shadow-2xl flex flex-col overflow-hidden ring-1 ring-white/5">
         
-        {/* Encoche Smartphone & Caméra Frontale */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-5 bg-gray-900 rounded-b-2xl z-30 flex items-center justify-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-black border border-gray-700" />
-          <div className="w-10 h-1 rounded-full bg-gray-800" />
+        {/* Android Punch-hole Camera & Speaker */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 pointer-events-none">
+          <div className="w-3.5 h-3.5 rounded-full bg-gray-900 border border-gray-800 flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-950" />
+          </div>
         </div>
 
-        {/* Écran du Smartphone */}
-        <div className="relative flex-1 bg-[#0A0A0C] rounded-[36px] overflow-y-auto overflow-x-hidden pt-4 pb-14 scrollbar-none flex flex-col">
+        {/* Android Status Bar */}
+        <div className="h-7 bg-[#0A0A0C] px-6 flex items-center justify-between text-[11px] font-semibold text-gray-300 select-none z-40 border-b border-gray-900">
+          <span>{currentTime}</span>
+          <div className="flex items-center gap-1.5">
+            <Signal className="w-3.5 h-3.5 text-gray-300" />
+            <Wifi className="w-3.5 h-3.5 text-gray-300" />
+            <BatteryMedium className="w-4 h-4 text-gray-300" />
+          </div>
+        </div>
+
+        {/* Mobile Viewport Screen */}
+        <div className="flex-1 overflow-y-auto bg-[#0A0A0C] relative scrollbar-none pb-20">
           {children}
         </div>
 
-        {/* Barre d'accueil inférieure type Android gesture */}
-        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-gray-700 rounded-full z-30" />
+        {/* Android Navigation Gesture Bar */}
+        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="w-32 h-1 bg-gray-700 rounded-full" />
+        </div>
+
       </div>
+
+      <div className="mt-4 text-center">
+        <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5">
+          <Smartphone className="w-3.5 h-3.5" />
+          <span>Simulateur Android (API 26+) - Basculez vers le mode Web large dans la barre supérieure</span>
+        </p>
+      </div>
+
     </div>
   );
 };

@@ -1,3 +1,8 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/Header';
@@ -6,7 +11,6 @@ import { HomeCatalog } from './components/HomeCatalog';
 import { AdminDashboard } from './components/AdminDashboard';
 import { UserProfile } from './components/UserProfile';
 import { AndroidCodeViewer } from './components/AndroidCodeViewer';
-import { AccountDetailModal } from './components/AccountDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { ToastContainer } from './components/ToastContainer';
 import { MobileFrame } from './components/MobileFrame';
@@ -41,10 +45,13 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0C] text-gray-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-[#0A0A0C] text-gray-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white w-full overflow-x-hidden">
+      {/* Header Bar */}
       <Header />
 
-      <main className="flex-1 pb-16 md:pb-8 pt-4">
+      {/* Main View Area */}
+      <main className="flex-1 pb-16 md:pb-8 pt-2 sm:pt-4 w-full">
+        {/* PWA Install Banner */}
         <PWAInstallBanner />
 
         {mobileFrameMode ? (
@@ -56,12 +63,15 @@ const MainLayout: React.FC = () => {
         )}
       </main>
 
+      {/* Network Connectivity Offline Indicator */}
       <OfflineIndicator />
 
+      {/* Footer (Desktop & Web view) */}
       {!mobileFrameMode && (
         <footer className="border-t border-gray-800 bg-[#0F0F12] py-10 px-4 sm:px-6 lg:px-8 text-xs text-gray-400">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
             
+            {/* Brand & info */}
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20">
                 <Tv className="w-4 h-4" />
@@ -76,6 +86,7 @@ const MainLayout: React.FC = () => {
               </div>
             </div>
 
+            {/* Quick Links */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
               <span className="flex items-center gap-1.5 text-green-400">
                 <ShieldCheck className="w-4 h-4" />
@@ -101,6 +112,7 @@ const MainLayout: React.FC = () => {
               </button>
             </div>
 
+            {/* Copyright */}
             <div className="text-[11px] text-gray-500 text-center md:text-right">
               Application Android Kotlin & Web MVVM • 2026 ShareStream Inc.
             </div>
@@ -109,16 +121,13 @@ const MainLayout: React.FC = () => {
         </footer>
       )}
 
+      {/* Android Mobile Navigation Bar */}
       <BottomNav />
 
-      {selectedAccount && (
-        <AccountDetailModal
-          account={selectedAccount}
-          onClose={() => setSelectedAccount(null)}
-        />
-      )}
-
+      {/* Authentication Modal */}
       <AuthModal />
+
+      {/* Reactive Toast Notifications */}
       <ToastContainer />
     </div>
   );
