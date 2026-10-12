@@ -1,85 +1,82 @@
 import React, { useState, useMemo } from 'react';
-import { useApp } from '../context/AppContext';
+import { Account, AccountPlatform } from '../types';
 import { AccountCard } from './AccountCard';
 import { AccountDetailModal } from './AccountDetailModal';
-import { FilterCategory, SortOption } from '../types';
+import { useApp } from '../context/AppContext';
 import { 
   Search, 
   SlidersHorizontal, 
   Sparkles, 
-  ShieldCheck, 
   Zap, 
+  ShieldCheck, 
   MessageCircle,
+  Clock,
   TrendingDown,
   TrendingUp,
-  Clock,
-  Tv
+  Tag
 } from 'lucide-react';
 
 export const HomeCatalog: React.FC = () => {
   const { 
     accounts, 
-    selectedAccount,
+    searchQuery, 
+    setSearchQuery, 
+    selectedAccount, 
     setSelectedAccount, 
     t, 
-    language,
-    whatsappNumber
+    language 
   } = useApp();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('Tous');
-  const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
-  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(0); // 0 = no price filter
+  const [selectedFilter, setSelectedFilter] = useState<AccountPlatform | 'Tous'>('Tous');
+  const [selectedSort, setSelectedSort] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
+  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(0);
 
-  // Filter options array
-  const filterButtons: { key: FilterCategory; labelKey: 'filterAll' | 'filterNetflix' | 'filterSpotify' | 'filterDisney' | 'filterOthers' }[] = [
-    { key: 'Tous', labelKey: 'filterAll' },
-    { key: 'Netflix', labelKey: 'filterNetflix' },
-    { key: 'Spotify', labelKey: 'filterSpotify' },
-    { key: 'Disney+', labelKey: 'filterDisney' },
-    { key: 'Autres', labelKey: 'filterOthers' },
+  // Platform quick filters
+  const platformCategories: Array<{ id: AccountPlatform | 'Tous'; label: string }> = [
+    { id: 'Tous', label: t('allCategories') },
+    { id: 'Netflix', label: 'Netflix' },
+    { id: 'Spotify', label: 'Spotify' },
+    { id: 'Disney+', label: 'Disney+' },
+    { id: 'Canal+', label: 'Canal+' },
+    { id: 'Prime Video', label: 'Prime Video' },
+    { id: 'YouTube', label: 'YouTube' },
+    { id: 'Crunchyroll', label: 'Crunchyroll' },
+    { id: 'IPTV', label: 'IPTV' },
   ];
 
-  // Price presets
+  // Budget slider presets in FCFA
   const pricePresets = [
-    { value: 0, labelKey: 'allPrices' as const },
-    { value: 2000, label: '≤ 2 000 FCFA' },
-    { value: 3000, label: '≤ 3 000 FCFA' },
-    { value: 5000, label: '≤ 5 000 FCFA' },
+    { labelKey: 'allBudgets' as const, value: 0 },
+    { label: '< 2 000 F', value: 2000 },
+    { label: '< 3 500 F', value: 3500 },
+    { label: '< 5 000 F', value: 5000 },
   ];
 
-  // Filter and Sort Logic
+  // Filtered & sorted account list
   const filteredAndSortedAccounts = useMemo(() => {
     let result = [...accounts];
 
-    // 1. Search Query filter
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    // 1. Category / Platform Filter
+    if (selectedFilter !== 'Tous') {
       result = result.filter(
-        (acc) =>
-          acc.name.toLowerCase().includes(q) ||
-          acc.platform.toLowerCase().includes(q) ||
-          acc.description.toLowerCase().includes(q) ||
-          (acc.quality && acc.quality.toLowerCase().includes(q))
+        (a) => a.platform.toLowerCase() === selectedFilter.toLowerCase()
       );
     }
 
-    // 2. Category Filter
-    if (selectedFilter !== 'Tous') {
-      if (selectedFilter === 'Autres') {
-        result = result.filter(
-          (acc) => !['netflix', 'spotify', 'disney+'].includes(acc.platform.toLowerCase())
-        );
-      } else {
-        result = result.filter(
-          (acc) => acc.platform.toLowerCase() === selectedFilter.toLowerCase()
-        );
-      }
+    // 2. Max Price Filter
+    if (maxPriceFilter > 0) {
+      result = result.filter((a) => a.price <= maxPriceFilter);
     }
 
-    // 3. Price Filter (range or select)
-    if (maxPriceFilter > 0) {
-      result = result.filter((acc) => acc.price <= maxPriceFilter);
+    // 3. Search Query
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.description.toLowerCase().includes(q) ||
+          a.platform.toLowerCase().includes(q)
+      );
     }
 
     // 4. Sorting
@@ -142,51 +139,38 @@ export const HomeCatalog: React.FC = () => {
         </div>
 
         {/* Decorative background glow */}
-        <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
-        <div className="absolute -right-10 -bottom-20 w-80 h-80 rounded-full bg-gray-700/10 blur-3xl pointer-events-none" />
+        <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* Search, Filter Tabs & Sort Controls */}
+      {/* Filter and Search Toolbar */}
       <div className="space-y-4">
         
-        {/* Top Controls Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Platform Categories Pill Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {platformCategories.map((cat) => {
+            const isActive = selectedFilter === cat.id;
+            return (
+              <button
+                key={cat.id}
+                id={`filter-pill-${cat.id.toLowerCase().replace(/[^a-z0-9]/g, '')}`}
+                onClick={() => setSelectedFilter(cat.id)}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 border ${
+                  isActive
+                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
+                    : 'bg-[#16161D] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Search, Sort and Budget Bar */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
-          {/* Filter Category Tabs [Tous] [Netflix] [Spotify] [Disney+] [Autres] */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {filterButtons.map((fb, index) => {
-              const isSelected = selectedFilter === fb.key;
-              const count = fb.key === 'Tous'
-                ? accounts.length
-                : fb.key === 'Autres'
-                ? accounts.filter(a => !['netflix', 'spotify', 'disney+'].includes(a.platform.toLowerCase())).length
-                : accounts.filter(a => a.platform.toLowerCase() === fb.key.toLowerCase()).length;
-
-              return (
-                <button
-                  key={`filter-category-${fb.key}-${index}`}
-                  id={`filter-tab-${fb.key.toLowerCase()}`}
-                  onClick={() => setSelectedFilter(fb.key)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                      : 'bg-gray-800 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <span>{t(fb.labelKey)}</span>
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                    isSelected ? 'bg-blue-700 text-white' : 'bg-gray-700 text-gray-300'
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Search & Sort Section */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Search Field */}
+          {/* Search Box */}
+          <div className="flex-1 flex items-center gap-2">
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
@@ -312,7 +296,7 @@ export const HomeCatalog: React.FC = () => {
 
       {/* Accounts Grid */}
       {filteredAndSortedAccounts.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
+        <div className="catalog-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 w-full">
           {filteredAndSortedAccounts.map((account, index) => {
             const cardKey = account.id ? `acc-${account.id}-${index}` : `account-card-${index}`;
             return (
@@ -325,24 +309,25 @@ export const HomeCatalog: React.FC = () => {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 p-8 rounded-3xl bg-[#16161D] border border-gray-800 space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-gray-500">
-            <Tv className="w-8 h-8" />
+        <div className="text-center py-16 bg-[#16161D] rounded-2xl border border-gray-800 p-8 space-y-3">
+          <div className="w-12 h-12 rounded-full bg-blue-600/10 text-blue-400 flex items-center justify-center mx-auto">
+            <Tag className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-gray-200">
+          <h3 className="text-base font-semibold text-white">
             {t('noAccountsFound')}
           </h3>
-          <p className="text-xs text-gray-500 max-w-sm mx-auto">
-            {t('tryChangingFilters')}
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">
+            {t('noAccountsFoundDesc')}
           </p>
           <button
             onClick={() => {
-              setSearchQuery('');
               setSelectedFilter('Tous');
+              setSearchQuery('');
+              setMaxPriceFilter(0);
             }}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
-            Afficher tous les comptes
+            Réinitialiser tous les filtres
           </button>
         </div>
       )}
@@ -351,7 +336,7 @@ export const HomeCatalog: React.FC = () => {
       {selectedAccount && (
         <AccountDetailModal
           account={selectedAccount}
-          isOpen={true}
+          isOpen={!!selectedAccount}
           onClose={() => setSelectedAccount(null)}
         />
       )}

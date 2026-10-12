@@ -47,7 +47,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
           onSelect(account);
         }
       }}
-      className={`group relative rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col select-none ${
+      className={`group relative rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden flex flex-col select-none w-full min-w-[260px] ${
         isReserved
           ? 'bg-[#16161D] border-gray-800 opacity-60 grayscale hover:opacity-80'
           : 'bg-[#16161D] border-gray-800 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/5'
