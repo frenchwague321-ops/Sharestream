@@ -1,24 +1,26 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Account, Language, Reservation, User, AccountFormData } from '../types';
-import { INITIAL_ACCOUNTS, DEFAULT_WHATSAPP_NUMBER } from '../data/initialData';
-import { translations } from '../data/translations';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Account, User, Reservation, Language, AccountStatus } from '../types';
+import { INITIAL_ACCOUNTS, INITIAL_USERS, INITIAL_RESERVATIONS, DEFAULT_WHATSAPP_NUMBER } from '../data/initialData';
+import { t as translate, translations } from '../i18n/translations';
+import confetti from 'canvas-confetti';
+import { db, auth } from '../firebase';
 import { 
-  db, 
-  auth, 
   collection, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
   doc, 
-  setDoc,
+  onSnapshot, 
+  setDoc, 
+  deleteDoc, 
+  getDocs, 
+  writeBatch 
+} from 'firebase/firestore';
+import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
+  signOut as firebaseSignOut,
   onAuthStateChanged
-} from '../firebase';
+} from 'firebase/auth';
 
-interface Toast {
+interface ToastState {
   id: string;
   message: string;
   type: 'success' | 'error' | 'info';
@@ -27,76 +29,368 @@ interface Toast {
 interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: keyof typeof translations['fr']) => string;
-  accounts: Account[];
-  reservations: Reservation[];
+  toggleLanguage: () => void;
+  t: (key: keyof typeof translations['fr'], params?: Record<string, string | number>) => string;
+  
   currentUser: User | null;
+  users: User[];
+  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  
+  accounts: Account[];
+  addAccount: (accountData: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateAccount: (id: string, updates: Partial<Account>) => void;
+  deleteAccount: (id: string) => void;
+  toggleAccountStatus: (id: string, newStatus: AccountStatus) => void;
+  
+  reservations: Reservation[];
+  reserveAccount: (accountId: string) => { success: boolean; error?: string };
+  
+  selectedAccount: Account | null;
+  setSelectedAccount: (acc: Account | null) => void;
+  
   activeTab: 'home' | 'admin' | 'profile' | 'code';
   setActiveTab: (tab: 'home' | 'admin' | 'profile' | 'code') => void;
-  selectedAccount: Account | null;
-  setSelectedAccount: (account: Account | null) => void;
-  whatsappNumber: string;
-  setWhatsappNumber: (num: string) => void;
-  addAccount: (account: AccountFormData) => void;
-  updateAccount: (id: string, account: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
-  addReservation: (accountId: string) => void;
-  deleteReservation: (id: string) => void;
-  generateWhatsAppLink: (account: Account) => string;
-  toasts: Toast[];
-  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
-  removeToast: (id: string) => void;
-  // Auth
+  
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   authModalMode: 'login' | 'register';
   setAuthModalMode: (mode: 'login' | 'register') => void;
-  login: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
-  users: User[];
-  deleteUser: (userId: string) => void;
+  
+  whatsappNumber: string;
+  setWhatsappNumber: (num: string) => void;
+  generateWhatsAppLink: (account: Account) => string;
+  
+  toasts: ToastState[];
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  removeToast: (id: string) => void;
+
+  mobileFrameMode: boolean;
+  setMobileFrameMode: (enabled: boolean) => void;
+
+  isCloudSyncing: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Language State
+const STORAGE_KEYS = {
+  LANG: 'sharestream_lang',
+  USER: 'sharestream_current_user',
+  ACCOUNTS: 'sharestream_accounts',
+  USERS: 'sharestream_users',
+  RESERVATIONS: 'sharestream_reservations',
+  WHATSAPP: 'sharestream_whatsapp_num',
+  FRAME_MODE: 'sharestream_mobile_frame',
+};
+
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Language
   const [language, setLanguageState] = useState<Language>(() => {
-    const saved = localStorage.getItem('sharestream_lang');
+    const saved = localStorage.getItem(STORAGE_KEYS.LANG);
     return (saved === 'en' || saved === 'fr') ? saved : 'fr';
   });
 
-  const setLanguage = (lang: Language) => {
-    setLanguageState(lang);
-    localStorage.setItem('sharestream_lang', lang);
-  };
-
-  const t = (key: keyof typeof translations['fr']): string => {
-    return translations[language][key] || translations['fr'][key] || key;
-  };
-
-  // Tab & Selection State
-  const [activeTab, setActiveTab] = useState<'home' | 'admin' | 'profile' | 'code'>('home');
-  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
-
-  // WhatsApp Number
-  const [whatsappNumber, setWhatsappNumberState] = useState<string>(() => {
-    return localStorage.getItem('sharestream_phone') || DEFAULT_WHATSAPP_NUMBER;
+  // Current User (initialized null or from stored session, validated by Firebase Auth)
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.USER);
+      if (saved) return JSON.parse(saved);
+      return null;
+    } catch {
+      return null;
+    }
   });
 
-  const setWhatsappNumber = (num: string) => {
-    setWhatsappNumberState(num);
-    localStorage.setItem('sharestream_phone', num);
-    if (db) {
-      setDoc(doc(db, 'settings', 'general'), { whatsappNumber: num }, { merge: true }).catch(() => {});
+  // Registered Users from Firestore
+  const [users, setUsers] = useState<User[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+      return saved ? JSON.parse(saved) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
     }
-  };
+  });
 
-  // Toast System
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  // Accounts
+  const [accounts, setAccounts] = useState<Account[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+      return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+    } catch {
+      return INITIAL_ACCOUNTS;
+    }
+  });
+
+  // Reservations
+  const [reservations, setReservations] = useState<Reservation[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.RESERVATIONS);
+      if (saved) {
+        const parsed: Reservation[] = JSON.parse(saved);
+        const hasJeanRes = parsed.some(r => r.userId === 'uid_firebase' || r.userEmail?.toLowerCase() === 'jean@email.com');
+        if (!hasJeanRes) {
+          const jeanReservation = INITIAL_RESERVATIONS.find(r => r.userId === 'uid_firebase');
+          return jeanReservation ? [jeanReservation, ...parsed] : parsed;
+        }
+        return parsed;
+      }
+      return INITIAL_RESERVATIONS;
+    } catch {
+      return INITIAL_RESERVATIONS;
+    }
+  });
+
+  // WhatsApp contact number
+  const [whatsappNumber, setWhatsappNumberState] = useState<string>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.WHATSAPP);
+    if (!saved || saved.replace(/[^0-9]/g, '') === '221770000000') {
+      return DEFAULT_WHATSAPP_NUMBER;
+    }
+    return saved;
+  });
+
+  // UI States
+  const [activeTab, setActiveTab] = useState<'home' | 'admin' | 'profile' | 'code'>('home');
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [toasts, setToasts] = useState<ToastState[]>([]);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(true);
+  const [mobileFrameMode, setMobileFrameMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.FRAME_MODE);
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Real-time Firestore synchronization with offline fallback
+  useEffect(() => {
+    let unsubscribeAccounts: () => void = () => {};
+    let unsubscribeUsers: () => void = () => {};
+    let unsubscribeReservations: () => void = () => {};
+    let unsubscribeSettings: () => void = () => {};
+    let unsubscribeAuth: () => void = () => {};
+
+    try {
+      // 0. Live Firebase Authentication state
+      if (auth) {
+        unsubscribeAuth = onAuthStateChanged(auth, (fbUser) => {
+          if (fbUser && fbUser.email) {
+            const cleanEmail = fbUser.email.toLowerCase();
+            const isAdmin = cleanEmail === 'moussawague062@gmail.com' || cleanEmail === 'admin@sharestream.com';
+            const userObj: User = {
+              id: fbUser.uid,
+              name: fbUser.displayName || (isAdmin ? 'Moussa Wagué' : cleanEmail.split('@')[0]),
+              email: cleanEmail,
+              role: isAdmin ? 'admin' : 'user',
+              phoneNumber: isAdmin ? '+221 77 705 91 02' : undefined,
+              createdAt: Date.now(),
+            };
+            setCurrentUser(userObj);
+          }
+        });
+      }
+      // 1. Live Accounts
+      const accountsCol = collection(db, 'accounts');
+      unsubscribeAccounts = onSnapshot(accountsCol, async (snapshot) => {
+        setIsCloudSyncing(false);
+        if (snapshot.empty) {
+          // Seed Firestore with INITIAL_ACCOUNTS if first initialization
+          try {
+            const batch = writeBatch(db);
+            INITIAL_ACCOUNTS.forEach((acc) => {
+              batch.set(doc(db, 'accounts', acc.id), acc);
+            });
+            await batch.commit();
+          } catch (err) {
+            console.warn('Could not seed initial accounts:', err);
+          }
+        } else {
+          const loadedAccounts: Account[] = [];
+          const seenIds = new Set<string>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Partial<Account>;
+            const rawId = data.id || docSnap.id || `acc-${Math.random().toString(36).substring(2, 9)}`;
+            let uniqueId = rawId;
+            let counter = 1;
+            while (seenIds.has(uniqueId)) {
+              uniqueId = `${rawId}-${counter}`;
+              counter++;
+            }
+            seenIds.add(uniqueId);
+            loadedAccounts.push({
+              ...(data as Account),
+              id: uniqueId,
+            });
+          });
+          loadedAccounts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          setAccounts(loadedAccounts);
+        }
+      }, (error) => {
+        console.warn('Firestore accounts sync error:', error);
+        setIsCloudSyncing(false);
+      });
+
+      // 2. Live Users
+      const usersCol = collection(db, 'users');
+      unsubscribeUsers = onSnapshot(usersCol, async (snapshot) => {
+        if (snapshot.empty) {
+          try {
+            const batch = writeBatch(db);
+            INITIAL_USERS.forEach((usr) => {
+              batch.set(doc(db, 'users', usr.id), usr);
+            });
+            await batch.commit();
+          } catch (err) {
+            console.warn('Could not seed initial users:', err);
+          }
+        } else {
+          const loadedUsers: User[] = [];
+          const seenUserIds = new Set<string>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Partial<User>;
+            const rawId = data.id || docSnap.id || `usr-${Math.random().toString(36).substring(2, 9)}`;
+            let uniqueId = rawId;
+            let counter = 1;
+            while (seenUserIds.has(uniqueId)) {
+              uniqueId = `${rawId}-${counter}`;
+              counter++;
+            }
+            seenUserIds.add(uniqueId);
+            loadedUsers.push({
+              ...(data as User),
+              id: uniqueId,
+            });
+          });
+          
+          // Guarantee Moussa Wagué (admin) & Jean Dupont exist
+          const hasAdmin = loadedUsers.some(u => u.email.toLowerCase() === 'moussawague062@gmail.com');
+          const hasJean = loadedUsers.some(u => u.email.toLowerCase() === 'jean@email.com');
+          if (!hasAdmin) {
+            setDoc(doc(db, 'users', 'usr-admin'), INITIAL_USERS[0], { merge: true }).catch(() => {});
+          }
+          if (!hasJean) {
+            const jean = INITIAL_USERS.find(u => u.email.toLowerCase() === 'jean@email.com');
+            if (jean) {
+              setDoc(doc(db, 'users', jean.id), jean, { merge: true }).catch(() => {});
+            }
+          }
+          setUsers(loadedUsers);
+        }
+      }, (error) => {
+        console.warn('Firestore users sync error:', error);
+      });
+
+      // 3. Live Reservations
+      const reservationsCol = collection(db, 'reservations');
+      unsubscribeReservations = onSnapshot(reservationsCol, async (snapshot) => {
+        if (snapshot.empty) {
+          try {
+            const batch = writeBatch(db);
+            INITIAL_RESERVATIONS.forEach((res) => {
+              batch.set(doc(db, 'reservations', res.id), res);
+            });
+            await batch.commit();
+          } catch (err) {
+            console.warn('Could not seed initial reservations:', err);
+          }
+        } else {
+          const loadedRes: Reservation[] = [];
+          const seenResIds = new Set<string>();
+          snapshot.forEach((docSnap) => {
+            const data = docSnap.data() as Partial<Reservation>;
+            const rawId = data.id || docSnap.id || `res-${Math.random().toString(36).substring(2, 9)}`;
+            let uniqueId = rawId;
+            let counter = 1;
+            while (seenResIds.has(uniqueId)) {
+              uniqueId = `${rawId}-${counter}`;
+              counter++;
+            }
+            seenResIds.add(uniqueId);
+            loadedRes.push({
+              ...(data as Reservation),
+              id: uniqueId,
+            });
+          });
+
+          // Guarantee Jean Dupont reservation exists in Firestore
+          const hasJeanRes = loadedRes.some(r => r.userId === 'uid_firebase' || r.userEmail?.toLowerCase() === 'jean@email.com');
+          if (!hasJeanRes) {
+            const jeanRes = INITIAL_RESERVATIONS.find(r => r.userId === 'uid_firebase');
+            if (jeanRes) {
+              setDoc(doc(db, 'reservations', jeanRes.id), jeanRes, { merge: true }).catch(() => {});
+            }
+          }
+
+          loadedRes.sort((a, b) => (b.reservedAt || 0) - (a.reservedAt || 0));
+          setReservations(loadedRes);
+        }
+      }, (error) => {
+        console.warn('Firestore reservations sync error:', error);
+      });
+
+      // 4. Live Settings (WhatsApp & Config)
+      const settingsDoc = doc(db, 'settings', 'general');
+      unsubscribeSettings = onSnapshot(settingsDoc, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data?.whatsappNumber) {
+            setWhatsappNumberState(data.whatsappNumber);
+          }
+        }
+      }, (error) => {
+        console.warn('Firestore settings sync error:', error);
+      });
+
+    } catch (err) {
+      console.warn('Firestore subscription error:', err);
+      setIsCloudSyncing(false);
+    }
+
+    return () => {
+      unsubscribeAccounts();
+      unsubscribeUsers();
+      unsubscribeReservations();
+      unsubscribeSettings();
+      unsubscribeAuth();
+    };
+  }, []);
+
+  // Persist storage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.LANG, language);
+  }, [language]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.USER);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(accounts));
+  }, [accounts]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RESERVATIONS, JSON.stringify(reservations));
+  }, [reservations]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.WHATSAPP, whatsappNumber);
+  }, [whatsappNumber]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.FRAME_MODE, JSON.stringify(mobileFrameMode));
+  }, [mobileFrameMode]);
+
+  // Toast helper
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    const id = `${Date.now()}-${Math.random()}`;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       removeToast(id);
@@ -107,285 +401,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // User & Auth State
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('sharestream_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
-
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('sharestream_users_list');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
-
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-
-  // Accounts state with local fallback
-  const [accounts, setAccounts] = useState<Account[]>(() => {
-    const saved = localStorage.getItem('sharestream_accounts');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return INITIAL_ACCOUNTS;
-      }
-    }
-    return INITIAL_ACCOUNTS;
-  });
-
-  // Reservations state with local fallback
-  const [reservations, setReservations] = useState<Reservation[]>(() => {
-    const saved = localStorage.getItem('sharestream_reservations');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
-
-  // Sync state to LocalStorage
-  useEffect(() => {
-    localStorage.setItem('sharestream_accounts', JSON.stringify(accounts));
-  }, [accounts]);
-
-  useEffect(() => {
-    localStorage.setItem('sharestream_reservations', JSON.stringify(reservations));
-  }, [reservations]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('sharestream_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('sharestream_user');
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('sharestream_users_list', JSON.stringify(users));
-  }, [users]);
-
-  // Firebase Realtime Subscriptions
-  useEffect(() => {
-    if (!db) return;
-
-    // Accounts Realtime Sync
-    const unsubAccounts = onSnapshot(
-      collection(db, 'accounts'),
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const loaded: Account[] = [];
-          snapshot.forEach((docSnap) => {
-            loaded.push({ id: docSnap.id, ...docSnap.data() } as Account);
-          });
-          setAccounts(loaded);
-        } else {
-          // Seed initial data if Firestore collection is empty
-          INITIAL_ACCOUNTS.forEach((acc) => {
-            const { id, ...data } = acc;
-            addDoc(collection(db, 'accounts'), data).catch(() => {});
-          });
-        }
-      },
-      (err) => {
-        console.warn('Firestore accounts error, using local fallback:', err.message);
-      }
-    );
-
-    // Reservations Realtime Sync
-    const unsubReservations = onSnapshot(
-      collection(db, 'reservations'),
-      (snapshot) => {
-        const loaded: Reservation[] = [];
-        snapshot.forEach((docSnap) => {
-          loaded.push({ id: docSnap.id, ...docSnap.data() } as Reservation);
-        });
-        setReservations(loaded);
-      },
-      (err) => {
-        console.warn('Firestore reservations error, using local fallback:', err.message);
-      }
-    );
-
-    // Settings Realtime Sync
-    const unsubSettings = onSnapshot(
-      doc(db, 'settings', 'general'),
-      (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data?.whatsappNumber) {
-            setWhatsappNumberState(data.whatsappNumber);
-          }
-        }
-      },
-      (err) => {
-        console.warn('Firestore settings error:', err.message);
-      }
-    );
-
-    // Users Realtime Sync
-    const unsubUsers = onSnapshot(
-      collection(db, 'users'),
-      (snapshot) => {
-        const loaded: User[] = [];
-        snapshot.forEach((docSnap) => {
-          loaded.push({ id: docSnap.id, ...docSnap.data() } as User);
-        });
-        if (loaded.length > 0) {
-          setUsers(loaded);
-        }
-      },
-      (err) => {
-        console.warn('Firestore users error:', err.message);
-      }
-    );
-
-    return () => {
-      unsubAccounts();
-      unsubReservations();
-      unsubSettings();
-      unsubUsers();
-    };
-  }, []);
-
-  // Firebase Auth State Listener
-  useEffect(() => {
-    if (!auth) return;
-
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      if (fbUser) {
-        const userEmail = fbUser.email?.toLowerCase() || '';
-        const isAdmin = userEmail === 'moussawague062@gmail.com';
-        const userObj: User = {
-          id: fbUser.uid,
-          name: fbUser.displayName || (isAdmin ? 'Moussa Wagué (Admin)' : userEmail.split('@')[0] || 'Utilisateur'),
-          email: userEmail,
-          role: isAdmin ? 'admin' : 'user',
-          phoneNumber: isAdmin ? '+221 77 705 91 02' : undefined,
-          createdAt: Date.now(),
-        };
-        setCurrentUser(userObj);
-      } else {
-        // If logged out from Firebase
-        if (currentUser && currentUser.id !== 'admin-fallback-1') {
-          setCurrentUser(null);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Account Operations
-  const addAccount = (accountData: AccountFormData) => {
-    const newAccount: Account = {
-      ...accountData,
-      id: Date.now().toString(),
-      createdAt: Date.now(),
-      slotsAvailable: accountData.slotsAvailable ?? 5,
-      slotsTotal: accountData.slotsTotal ?? 5,
-      features: accountData.features || ['4K UHD', 'Multi-écrans', 'Garantie 30j'],
-    };
-
-    setAccounts((prev) => [newAccount, ...prev]);
-
-    if (db) {
-      const { id, ...data } = newAccount;
-      addDoc(collection(db, 'accounts'), data)
-        .then((docRef) => {
-          setAccounts((prev) =>
-            prev.map((acc) => (acc.id === newAccount.id ? { ...acc, id: docRef.id } : acc))
-          );
-        })
-        .catch(() => {});
-    }
-
-    showToast(t('addAccountSuccess'), 'success');
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
   };
 
-  const updateAccount = (id: string, accountData: Partial<Account>) => {
-    setAccounts((prev) =>
-      prev.map((acc) => (acc.id === id ? { ...acc, ...accountData } : acc))
-    );
-
-    if (db) {
-      updateDoc(doc(db, 'accounts', id), accountData).catch(() => {});
-    }
-
-    showToast(t('updateAccountSuccess'), 'success');
+  const toggleLanguage = () => {
+    setLanguageState((prev) => (prev === 'fr' ? 'en' : 'fr'));
   };
 
-  const deleteAccount = (id: string) => {
-    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
-
-    if (db) {
-      deleteDoc(doc(db, 'accounts', id)).catch(() => {});
-    }
-
-    showToast(t('deleteAccountSuccess'), 'info');
-  };
-
-  // Reservation Operations
-  const addReservation = (accountId: string) => {
-    const targetAccount = accounts.find((a) => a.id === accountId);
-    if (!targetAccount) return;
-
-    const newRes: Reservation = {
-      id: Date.now().toString(),
-      accountId: targetAccount.id,
-      accountName: targetAccount.name,
-      platform: targetAccount.platform,
-      userEmail: currentUser?.email || 'visiteur@sharestream.app',
-      userName: currentUser?.name || 'Visiteur WhatsApp',
-      date: new Date().toISOString(),
-      status: 'pending',
-    };
-
-    setReservations((prev) => [newRes, ...prev]);
-
-    // Decrement slot or mark reserved
-    const newSlots = Math.max(0, (targetAccount.slotsAvailable || 1) - 1);
-    updateAccount(accountId, {
-      slotsAvailable: newSlots,
-      status: newSlots === 0 ? 'reserved' : targetAccount.status,
-    });
-
-    if (db) {
-      const { id, ...data } = newRes;
-      addDoc(collection(db, 'reservations'), data).catch(() => {});
-    }
-
-    showToast(t('reservationSuccess'), 'success');
-  };
-
-  const deleteReservation = (id: string) => {
-    setReservations((prev) => prev.filter((r) => r.id !== id));
-    if (db) {
-      deleteDoc(doc(db, 'reservations', id)).catch(() => {});
-    }
-    showToast('Réservation annulée', 'info');
+  const t = (key: keyof typeof translations['fr'], params?: Record<string, string | number>) => {
+    return translate(language, key, params);
   };
 
   // WhatsApp Link Generator
-  const generateWhatsAppLink = (account: Account): string => {
-    const cleanPhone = whatsappNumber.replace(/[^0-9+]/g, '') || DEFAULT_WHATSAPP_NUMBER;
+  const generateWhatsAppLink = (account: Account) => {
+    const cleanPhone = whatsappNumber.replace(/[^0-9+]/g, '');
     const message = language === 'en'
       ? `Hello, I would like to rent ${account.name} for ${account.price.toLocaleString()} FCFA/month. Thank you!`
       : `Bonjour, je souhaite louer ${account.name} pour ${account.price.toLocaleString()} FCFA/mois. Merci !`;
@@ -468,33 +498,162 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (authErr: any) {
       console.warn('Firebase Auth createUser error:', authErr.code, authErr.message);
       if (authErr.code === 'auth/email-already-in-use') {
-        return { success: false, error: 'Cet email est déjà utilisé. Veuillez vous connecter.' };
-      }
-      if (authErr.code === 'auth/invalid-email') {
-        return { success: false, error: 'Format d\'adresse email invalide.' };
+        return { success: false, error: 'Cet email est déjà enregistré. Veuillez vous connecter avec votre mot de passe.' };
       }
       if (authErr.code === 'auth/weak-password') {
-        return { success: false, error: 'Mot de passe trop faible. Utilisez au moins 6 caractères.' };
+        return { success: false, error: 'Le mot de passe doit comporter au moins 6 caractères.' };
       }
-      return { success: false, error: 'Erreur à l\'inscription : ' + (authErr.message || 'veuillez réessayer.') };
+      return { success: false, error: 'Erreur d\'inscription : ' + (authErr.message || 'veuillez vérifier vos informations.') };
     }
   };
 
-  const logout = () => {
-    if (auth) {
-      signOut(auth).catch(() => {});
+  const logout = async () => {
+    try {
+      if (auth) {
+        await firebaseSignOut(auth);
+      }
+    } catch (e) {
+      console.warn('Sign out notice:', e);
     }
     setCurrentUser(null);
-    setActiveTab('home');
+    if (activeTab === 'admin' || activeTab === 'profile') {
+      setActiveTab('home');
+    }
     showToast(t('logoutSuccess'), 'info');
   };
 
-  const deleteUser = (userId: string) => {
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    if (db) {
-      deleteDoc(doc(db, 'users', userId)).catch(() => {});
+  // Account Operations (Admin) - Synchronized with Firestore
+  const addAccount = (accountData: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newAcc: Account = {
+      ...accountData,
+      id: `acc-${Date.now()}`,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setAccounts((prev) => [newAcc, ...prev]);
+    setDoc(doc(db, 'accounts', newAcc.id), newAcc).catch((err) => {
+      console.warn('Firestore addAccount error:', err);
+    });
+    showToast(t('accountSaved'), 'success');
+  };
+
+  const updateAccount = (id: string, updates: Partial<Account>) => {
+    const timestamp = Date.now();
+    setAccounts((prev) =>
+      prev.map((acc) => (acc.id === id ? { ...acc, ...updates, updatedAt: timestamp } : acc))
+    );
+    if (selectedAccount?.id === id) {
+      setSelectedAccount((prev) => (prev ? { ...prev, ...updates, updatedAt: timestamp } : null));
     }
-    showToast('Utilisateur supprimé', 'info');
+    setDoc(doc(db, 'accounts', id), { ...updates, updatedAt: timestamp }, { merge: true }).catch((err) => {
+      console.warn('Firestore updateAccount error:', err);
+    });
+    showToast(t('accountSaved'), 'success');
+  };
+
+  const deleteAccount = (id: string) => {
+    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
+    if (selectedAccount?.id === id) {
+      setSelectedAccount(null);
+    }
+    deleteDoc(doc(db, 'accounts', id)).catch((err) => {
+      console.warn('Firestore deleteAccount error:', err);
+    });
+    showToast(t('deleteSuccess'), 'info');
+  };
+
+  const toggleAccountStatus = (id: string, newStatus: AccountStatus) => {
+    const timestamp = Date.now();
+    let slots = 0;
+    setAccounts((prev) =>
+      prev.map((acc) => {
+        if (acc.id === id) {
+          slots = newStatus === 'reserved' ? 0 : (acc.slotsTotal || 1);
+          return {
+            ...acc,
+            status: newStatus,
+            slotsAvailable: slots,
+            updatedAt: timestamp,
+          };
+        }
+        return acc;
+      })
+    );
+    if (selectedAccount?.id === id) {
+      setSelectedAccount((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: newStatus,
+              slotsAvailable: newStatus === 'reserved' ? 0 : (prev.slotsTotal || 1),
+              updatedAt: timestamp,
+            }
+          : null
+      );
+    }
+    setDoc(doc(db, 'accounts', id), {
+      status: newStatus,
+      slotsAvailable: slots,
+      updatedAt: timestamp,
+    }, { merge: true }).catch((err) => {
+      console.warn('Firestore toggleAccountStatus error:', err);
+    });
+    showToast(t('statusUpdated'), 'success');
+  };
+
+  // Reservation Operation - Synchronized with Firestore
+  const reserveAccount = (accountId: string): { success: boolean; error?: string } => {
+    if (!currentUser) {
+      setIsAuthModalOpen(true);
+      return { success: false, error: t('mustBeLoggedInToReserve') };
+    }
+
+    const targetAccount = accounts.find((a) => a.id === accountId);
+    if (!targetAccount) return { success: false, error: 'Account not found' };
+
+    // Create reservation record
+    const newReservation: Reservation = {
+      id: `res-${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      accountId: targetAccount.id,
+      accountName: targetAccount.name,
+      platform: targetAccount.platform,
+      price: targetAccount.price,
+      reservedAt: Date.now(),
+      status: 'active',
+    };
+
+    setReservations((prev) => [newReservation, ...prev]);
+
+    // Save reservation to Firestore
+    setDoc(doc(db, 'reservations', newReservation.id), newReservation).catch((err) => {
+      console.warn('Firestore reservation creation error:', err);
+    });
+
+    // Update account status to reserved
+    toggleAccountStatus(accountId, 'reserved');
+
+    // Trigger celebration confetti
+    try {
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#6366f1', '#ec4899', '#10b981', '#f59e0b'],
+      });
+    } catch {
+      // ignore in environments without canvas
+    }
+
+    showToast(t('reserveSuccessMessage', { accountName: targetAccount.name }), 'success');
+    return { success: true };
+  };
+
+  const handleSetWhatsappNumber = (num: string) => {
+    setWhatsappNumberState(num);
+    setDoc(doc(db, 'settings', 'general'), { whatsappNumber: num }, { merge: true }).catch(() => {});
   };
 
   return (
@@ -502,34 +661,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         language,
         setLanguage,
+        toggleLanguage,
         t,
-        accounts,
-        reservations,
         currentUser,
-        activeTab,
-        setActiveTab,
-        selectedAccount,
-        setSelectedAccount,
-        whatsappNumber,
-        setWhatsappNumber,
+        users,
+        login,
+        register,
+        logout,
+        accounts,
         addAccount,
         updateAccount,
         deleteAccount,
-        addReservation,
-        deleteReservation,
-        generateWhatsAppLink,
-        toasts,
-        showToast,
-        removeToast,
+        toggleAccountStatus,
+        reservations,
+        reserveAccount,
+        selectedAccount,
+        setSelectedAccount,
+        activeTab,
+        setActiveTab,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,
         setAuthModalMode,
-        login,
-        register,
-        logout,
-        users,
-        deleteUser,
+        whatsappNumber,
+        setWhatsappNumber: handleSetWhatsappNumber,
+        generateWhatsAppLink,
+        toasts,
+        showToast,
+        removeToast,
+        mobileFrameMode,
+        setMobileFrameMode,
+        isCloudSyncing,
       }}
     >
       {children}
@@ -545,6 +707,7 @@ export const useApp = () => {
   return context;
 };
 
-// Aliases for compatibility
+// Alias de compatibilité
+export const useAppContext = useApp;
 export { AppContext };
-export default AppContext;
+export default useApp;
