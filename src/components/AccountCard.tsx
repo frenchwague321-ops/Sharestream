@@ -14,7 +14,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
 
   const isReserved = account.status === 'reserved';
   const platformPreset = PLATFORM_PRESETS.find(
-    (p) => p.name.toLowerCase() === account.platform.toLowerCase()
+    (p) => (p.name || '').toLowerCase() === (account?.platform || '').toLowerCase()
   );
 
   const badgeColor = platformPreset?.badgeColor || 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30';
@@ -58,122 +58,133 @@ export const AccountCard: React.FC<AccountCardProps> = ({ account, onSelect }) =
         <img
           src={displayImage}
           alt={account.name}
-          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-            isReserved ? 'filter brightness-75' : ''
-          }`}
+          className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 ease-out"
           loading="lazy"
         />
-        
-        {/* Subtle Dark Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#16161D] via-[#16161D]/40 to-transparent" />
 
-        {/* Platform Badge */}
+        {/* Platform Badge (e.g. Netflix, Spotify) */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
-          <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border backdrop-blur-md shadow-sm ${badgeColor}`}>
+          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border backdrop-blur-md shadow-md ${badgeColor}`}>
             {account.platform}
           </span>
           {account.quality && (
-            <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-black/70 text-gray-300 border border-white/10 backdrop-blur-md">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/60 text-gray-200 border border-white/10 backdrop-blur-md">
               {account.quality}
             </span>
           )}
         </div>
 
-        {/* Status Badge (Top Right) */}
+        {/* Availability Badge */}
         <div className="absolute top-3 right-3">
           {isReserved ? (
-            <span 
-              id={`status-badge-reserved-${account.id}`}
-              className="inline-flex items-center gap-1 bg-gray-500/20 text-gray-400 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider backdrop-blur-md border border-gray-500/30"
-            >
-              <Lock className="w-3 h-3 text-gray-400" />
-              <span>{t('statusReserved')}</span>
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 backdrop-blur-md">
+              <Lock className="w-3 h-3" />
+              {t('statusReserved')}
             </span>
           ) : (
-            <span 
-              id={`status-badge-available-${account.id}`}
-              className="inline-flex items-center gap-1 bg-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider backdrop-blur-md border border-green-500/30"
-            >
-              <CheckCircle2 className="w-3 h-3 text-green-400" />
-              <span>{t('statusAvailable')}</span>
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 backdrop-blur-md shadow-sm">
+              <CheckCircle2 className="w-3 h-3" />
+              {t('statusAvailable')}
             </span>
           )}
         </div>
 
-        {/* Slots & Profile Count Indicator */}
-        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs text-gray-300">
-          <div className="flex items-center gap-1.5 bg-black/80 px-2.5 py-1 rounded-md backdrop-blur-md border border-white/10">
-            <Users className="w-3.5 h-3.5 text-blue-400" />
+        {/* Slots Badge */}
+        {account.slotsAvailable !== undefined && (
+          <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2 py-0.5 rounded-md bg-black/70 text-[11px] text-gray-300 font-medium backdrop-blur-sm border border-white/10">
+            <Users className="w-3 h-3 text-blue-400" />
             <span>
-              {account.slotsAvailable !== undefined 
-                ? `${account.slotsAvailable}/${account.slotsTotal || account.profilesCount || 5} ${t('slotAvailable')}`
-                : `${account.profilesCount || 5} ${t('profiles')}`}
+              {account.slotsAvailable} / {account.slotsTotal || 5} {t('slotsLeft')}
             </span>
           </div>
-          <span className="text-[10px] text-blue-300 font-medium flex items-center gap-1 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-500/30">
-            <Sparkles className="w-3 h-3 text-blue-400" />
-            100% Garanti
-          </span>
-        </div>
+        )}
       </div>
 
       {/* Card Body */}
-      <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-        <div>
-          {/* Account Title */}
-          <h3 className="font-bold text-base sm:text-lg text-gray-100 group-hover:text-blue-400 transition-colors line-clamp-1">
-            {account.name}
-          </h3>
+      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4">
+        
+        {/* Title & Description */}
+        <div className="space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-bold text-base sm:text-lg text-white group-hover:text-blue-400 transition-colors line-clamp-1">
+              {account.name}
+            </h3>
+          </div>
 
-          {/* Description */}
-          <p className="mt-1.5 text-xs text-gray-400 line-clamp-2 leading-relaxed">
+          <p className="text-xs sm:text-sm text-gray-400 line-clamp-2 leading-relaxed">
             {account.description}
           </p>
         </div>
 
-        {/* Price & Action Bar */}
-        <div className="pt-3 border-t border-gray-800/80 flex items-center justify-between gap-2">
+        {/* Key Features Pill List */}
+        {account.features && account.features.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {account.features.slice(0, 2).map((feat, idx) => (
+              <span
+                key={`feat-${account.id}-${idx}`}
+                className="inline-flex items-center gap-1 text-[11px] text-gray-400 bg-gray-900/80 px-2 py-0.5 rounded-md border border-gray-800"
+              >
+                <Sparkles className="w-2.5 h-2.5 text-blue-400" />
+                <span className="truncate max-w-[140px]">{feat}</span>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Footer: Price & Actions */}
+        <div className="pt-3 border-t border-gray-800 flex items-center justify-between gap-2">
+          
           {/* Price */}
           <div>
-            <div className="text-[9px] uppercase tracking-wider font-semibold text-gray-500">
-              {t('priceLabel')}
+            <div className="text-[10px] uppercase font-bold tracking-wider text-gray-400">
+              {t('pricePerMonth')}
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold text-white font-['Outfit']">
+              <span className="text-lg sm:text-xl font-extrabold text-white">
                 {account.price.toLocaleString()}
               </span>
-              <span className="text-xs text-gray-500 uppercase ml-0.5">
-                {t('currency')} / mois
-              </span>
+              <span className="text-xs font-bold text-blue-400">FCFA</span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-1.5">
-            {/* Direct WhatsApp trigger */}
+          <div className="flex items-center gap-2">
+            
+            {/* Direct WhatsApp Button */}
             <button
               id={`whatsapp-btn-${account.id}`}
               type="button"
               onClick={handleWhatsAppClick}
-              title="Contacter sur WhatsApp"
-              className="p-2 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-colors shadow-sm active:scale-95"
+              disabled={isReserved}
+              title={t('whatsappContact')}
+              className={`p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                isReserved
+                  ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 active:scale-95'
+              }`}
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4 fill-current" />
+              <span className="hidden sm:inline">WhatsApp</span>
             </button>
 
-            {/* View Details */}
+            {/* Details Button */}
             <button
-              id={`view-detail-btn-${account.id}`}
+              id={`details-btn-${account.id}`}
               type="button"
               onClick={handleDetailsClick}
-              className="px-3 py-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white text-xs font-semibold rounded-lg flex items-center gap-1 border border-blue-500/20 hover:border-blue-500 transition-all duration-200 active:scale-95"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-semibold transition-all flex items-center gap-1 border border-gray-700/60 active:scale-95"
             >
-              <span>{t('viewDetails')}</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              <span className="hidden sm:inline">{t('seeDetails')}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
+
           </div>
+
         </div>
+
       </div>
+
     </div>
   );
 };

@@ -1,94 +1,102 @@
 import React, { useState, useMemo } from 'react';
-import { Account, AccountPlatform } from '../types';
+import { useApp } from '../context/AppContext';
+import { Account, FilterCategory } from '../types';
 import { AccountCard } from './AccountCard';
 import { AccountDetailModal } from './AccountDetailModal';
-import { useApp } from '../context/AppContext';
 import { 
   Search, 
-  SlidersHorizontal, 
-  Sparkles, 
-  Zap, 
+  TrendingDown, 
+  TrendingUp, 
+  Clock, 
   ShieldCheck, 
-  MessageCircle,
-  Clock,
-  TrendingDown,
-  TrendingUp,
-  Tag
+  Zap, 
+  MessageCircle, 
+  Sparkles,
+  SlidersHorizontal,
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
+
+type SortOption = 'newest' | 'price_asc' | 'price_desc';
 
 export const HomeCatalog: React.FC = () => {
   const { 
     accounts, 
-    searchQuery, 
-    setSearchQuery, 
-    selectedAccount, 
-    setSelectedAccount, 
+    language, 
     t, 
-    language 
+    selectedAccount, 
+    setSelectedAccount 
   } = useApp();
 
-  const [selectedFilter, setSelectedFilter] = useState<AccountPlatform | 'Tous'>('Tous');
-  const [selectedSort, setSelectedSort] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
-  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<FilterCategory>('Tous');
+  const [selectedSort, setSelectedSort] = useState<SortOption>('newest');
+  const [maxPriceFilter, setMaxPriceFilter] = useState<number>(0); // 0 = no price filter
 
-  // Platform quick filters
-  const platformCategories: Array<{ id: AccountPlatform | 'Tous'; label: string }> = [
-    { id: 'Tous', label: t('allCategories') },
-    { id: 'Netflix', label: 'Netflix' },
-    { id: 'Spotify', label: 'Spotify' },
-    { id: 'Disney+', label: 'Disney+' },
-    { id: 'Canal+', label: 'Canal+' },
-    { id: 'Prime Video', label: 'Prime Video' },
-    { id: 'YouTube', label: 'YouTube' },
-    { id: 'Crunchyroll', label: 'Crunchyroll' },
-    { id: 'IPTV', label: 'IPTV' },
+  // Filter options array
+  const filterButtons: { key: FilterCategory; labelKey: 'filterAll' | 'filterNetflix' | 'filterSpotify' | 'filterDisney' | 'filterOthers' }[] = [
+    { key: 'Tous', labelKey: 'filterAll' },
+    { key: 'Netflix', labelKey: 'filterNetflix' },
+    { key: 'Spotify', labelKey: 'filterSpotify' },
+    { key: 'Disney+', labelKey: 'filterDisney' },
+    { key: 'Autres', labelKey: 'filterOthers' },
   ];
 
-  // Budget slider presets in FCFA
+  // Price presets
   const pricePresets = [
-    { labelKey: 'allBudgets' as const, value: 0 },
-    { label: '< 2 000 F', value: 2000 },
-    { label: '< 3 500 F', value: 3500 },
-    { label: '< 5 000 F', value: 5000 },
+    { value: 0, labelKey: 'allPrices' as const },
+    { value: 2000, label: '≤ 2 000 FCFA' },
+    { value: 3000, label: '≤ 3 000 FCFA' },
+    { value: 5000, label: '≤ 5 000 FCFA' },
   ];
 
-  // Filtered & sorted account list
+  // Filter and Sort Logic
   const filteredAndSortedAccounts = useMemo(() => {
-    let result = [...accounts];
+    let result = Array.isArray(accounts) ? [...accounts] : [];
+    result = result.filter(Boolean);
 
-    // 1. Category / Platform Filter
+    // 1. Search Query filter
+    const safeSearchQuery = (searchQuery || '').trim();
+    if (safeSearchQuery) {
+      const q = safeSearchQuery.toLowerCase();
+      result = result.filter(
+        (acc) =>
+          (acc?.name || '').toLowerCase().includes(q) ||
+          (acc?.platform || '').toLowerCase().includes(q) ||
+          (acc?.description || '').toLowerCase().includes(q) ||
+          ((acc?.quality || '').toLowerCase().includes(q))
+      );
+    }
+
+    // 2. Category Filter
     if (selectedFilter !== 'Tous') {
-      result = result.filter(
-        (a) => a.platform.toLowerCase() === selectedFilter.toLowerCase()
-      );
+      const targetCategory = (selectedFilter || '').toLowerCase();
+      if (selectedFilter === 'Autres') {
+        result = result.filter(
+          (acc) => !['netflix', 'spotify', 'disney+'].includes((acc?.platform || '').toLowerCase())
+        );
+      } else {
+        result = result.filter(
+          (acc) => (acc?.platform || '').toLowerCase() === targetCategory
+        );
+      }
     }
 
-    // 2. Max Price Filter
+    // 3. Price Filter (range or select)
     if (maxPriceFilter > 0) {
-      result = result.filter((a) => a.price <= maxPriceFilter);
-    }
-
-    // 3. Search Query
-    if (searchQuery.trim() !== '') {
-      const q = searchQuery.toLowerCase().trim();
-      result = result.filter(
-        (a) =>
-          a.name.toLowerCase().includes(q) ||
-          a.description.toLowerCase().includes(q) ||
-          a.platform.toLowerCase().includes(q)
-      );
+      result = result.filter((acc) => (acc?.price || 0) <= maxPriceFilter);
     }
 
     // 4. Sorting
     result.sort((a, b) => {
       if (selectedSort === 'price_asc') {
-        return a.price - b.price;
+        return (a?.price || 0) - (b?.price || 0);
       }
       if (selectedSort === 'price_desc') {
-        return b.price - a.price;
+        return (b?.price || 0) - (a?.price || 0);
       }
       // Newest
-      return b.createdAt - a.createdAt;
+      return (b?.createdAt || 0) - (a?.createdAt || 0);
     });
 
     return result;
@@ -100,30 +108,29 @@ export const HomeCatalog: React.FC = () => {
       {/* Hero Welcome Banner */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-[#0F0F12] via-[#16161D] to-[#0A0A0C] border border-gray-800 p-6 sm:p-8 md:p-10 shadow-2xl">
         <div className="relative z-10 max-w-2xl space-y-3">
-          
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-            <span>Économisez jusqu'à 75% sur vos abonnements</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{t('heroBadge')}</span>
           </div>
-
-          <h1 className="text-2xl sm:text-4xl font-bold text-white tracking-tight leading-tight font-['Outfit']">
-            {language === 'fr' ? (
-              <>Louez vos comptes <span className="text-blue-500">Netflix, Spotify & Disney+</span></>
+          
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
+            {language === 'en' ? (
+              <>Premium accounts at <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">unbeatable prices</span></>
             ) : (
-              <>Rent your favorite <span className="text-blue-500">Streaming Accounts</span> with confidence</>
+              <>Des comptes premium à <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">prix imbattables</span></>
             )}
           </h1>
-
-          <p className="text-xs sm:text-sm text-gray-400 leading-relaxed">
-            {language === 'fr' 
-              ? 'Accès immédiat avec profils sécurisés par code PIN et assistance WhatsApp en direct. Payez mensuellement en FCFA sans engagement.'
-              : 'Instant access with private PIN-protected profiles and live WhatsApp support. Flexible monthly billing in FCFA.'}
+          
+          <p className="text-sm sm:text-base text-gray-400 leading-relaxed">
+            {language === 'en'
+              ? 'Access official subscriptions shared safely. Reserve in one click, get your credentials instantly via WhatsApp.'
+              : 'Accédez à vos abonnements favoris en toute sécurité. Réservez en 1 clic et recevez vos identifiants par WhatsApp.'}
           </p>
 
-          {/* Quick value badges */}
-          <div className="pt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400">
+          {/* Quick trust metrics */}
+          <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-gray-400">
             <div className="flex items-center gap-1.5">
-              <Zap className="w-4 h-4 text-green-400" />
+              <Zap className="w-4 h-4 text-yellow-400" />
               <span>Livraison instantanée</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -139,45 +146,58 @@ export const HomeCatalog: React.FC = () => {
         </div>
 
         {/* Decorative background glow */}
-        <div className="absolute -right-16 -top-16 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+        <div className="absolute -right-10 -bottom-20 w-80 h-80 rounded-full bg-gray-700/10 blur-3xl pointer-events-none" />
       </div>
 
-      {/* Filter and Search Toolbar */}
+      {/* Search, Filter Tabs & Sort Controls */}
       <div className="space-y-4">
         
-        {/* Platform Categories Pill Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {platformCategories.map((cat) => {
-            const isActive = selectedFilter === cat.id;
-            return (
-              <button
-                key={cat.id}
-                id={`filter-pill-${cat.id.toLowerCase().replace(/[^a-z0-9]/g, '')}`}
-                onClick={() => setSelectedFilter(cat.id)}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-200 border ${
-                  isActive
-                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-600/20'
-                    : 'bg-[#16161D] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
-                }`}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search, Sort and Budget Bar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        {/* Top Controls Bar */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           
-          {/* Search Box */}
-          <div className="flex-1 flex items-center gap-2">
+          {/* Filter Category Tabs [Tous] [Netflix] [Spotify] [Disney+] [Autres] */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {filterButtons.map((fb, index) => {
+              const isSelected = selectedFilter === fb.key;
+              const count = fb.key === 'Tous'
+                ? (Array.isArray(accounts) ? accounts.length : 0)
+                : fb.key === 'Autres'
+                ? (Array.isArray(accounts) ? accounts.filter(a => !['netflix', 'spotify', 'disney+'].includes((a?.platform || '').toLowerCase())).length : 0)
+                : (Array.isArray(accounts) ? accounts.filter(a => (a?.platform || '').toLowerCase() === (fb.key || '').toLowerCase()).length : 0);
+
+              return (
+                <button
+                  key={`filter-category-${fb.key}-${index}`}
+                  id={`filter-tab-${fb.key.toLowerCase()}`}
+                  onClick={() => setSelectedFilter(fb.key)}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap flex items-center gap-2 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <span>{t(fb.labelKey)}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    isSelected ? 'bg-blue-700 text-white' : 'bg-gray-700 text-gray-300'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Search & Sort Section */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Search Field */}
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
               <input
                 id="accounts-search-input"
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchQuery || ''}
+                onChange={(e) => setSearchQuery(e.target.value || '')}
                 placeholder={t('searchPlaceholder')}
                 className="w-full pl-10 pr-4 py-2 bg-gray-900 border border-gray-800 rounded-lg text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors shadow-sm"
               />
@@ -233,72 +253,62 @@ export const HomeCatalog: React.FC = () => {
 
         </div>
 
-        {/* Price Filter Bar (Range Slider & Presets) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:px-4 rounded-2xl bg-[#16161D] border border-gray-800 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <SlidersHorizontal className="w-4 h-4 text-blue-400 flex-shrink-0" />
-            <span className="font-semibold text-gray-300">{t('priceFilterLabel')}</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {pricePresets.map((preset, index) => (
-                <button
-                  key={`price-preset-${preset.value}-${index}`}
-                  id={`price-preset-${preset.value}`}
-                  onClick={() => setMaxPriceFilter(preset.value)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                    maxPriceFilter === preset.value
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-gray-900 text-gray-400 hover:text-gray-200 border border-gray-800'
-                  }`}
-                >
-                  {'labelKey' in preset ? t(preset.labelKey) : preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Filter sub-bar: Price filter presets */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-gray-800/60 text-xs">
+          <span className="text-gray-400 font-medium flex items-center gap-1 mr-1">
+            <SlidersHorizontal className="w-3 h-3 text-blue-400" />
+            Prix :
+          </span>
 
-          {/* Range Slider for custom maximum budget */}
-          <div className="flex items-center gap-3 w-full sm:w-64 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-800">
-            <span className="text-[11px] text-gray-400 whitespace-nowrap min-w-[100px]">
-              {maxPriceFilter > 0 
-                ? t('maxPriceSlider', { price: maxPriceFilter.toLocaleString() })
-                : '10 000 FCFA max'}
-            </span>
-            <input
-              id="price-range-slider"
-              type="range"
-              min={1000}
-              max={6000}
-              step={500}
-              value={maxPriceFilter || 6000}
-              onChange={(e) => setMaxPriceFilter(Number(e.target.value))}
-              className="w-full accent-blue-600 cursor-pointer h-1.5 bg-gray-800 rounded-lg appearance-none"
-              title="Ajuster le budget maximum"
-            />
-          </div>
+          {pricePresets.map((preset) => {
+            const isActive = maxPriceFilter === preset.value;
+            return (
+              <button
+                key={`price-preset-${preset.value}`}
+                onClick={() => setMaxPriceFilter(preset.value)}
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold'
+                    : 'bg-gray-900/60 text-gray-400 hover:text-gray-300 border border-gray-800/80'
+                }`}
+              >
+                {preset.labelKey ? t(preset.labelKey) : preset.label}
+              </button>
+            );
+          })}
+
+          {/* Reset Filters button if active */}
+          {(selectedFilter !== 'Tous' || maxPriceFilter > 0 || (searchQuery || '').trim() !== '') && (
+            <button
+              onClick={() => {
+                setSelectedFilter('Tous');
+                setMaxPriceFilter(0);
+                setSearchQuery('');
+              }}
+              className="ml-auto flex items-center gap-1 text-gray-400 hover:text-red-400 transition-colors py-1 px-2 rounded hover:bg-gray-800/50"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>{language === 'en' ? 'Reset' : 'Réinitialiser'}</span>
+            </button>
+          )}
         </div>
 
       </div>
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between text-xs text-gray-500 uppercase tracking-widest">
-        <span>
-          {t('accountsCount', { count: filteredAndSortedAccounts.length })}
-        </span>
-        {selectedFilter !== 'Tous' && (
-          <button
-            onClick={() => setSelectedFilter('Tous')}
-            className="text-blue-400 hover:underline lowercase tracking-normal"
-          >
-            Réinitialiser ({selectedFilter})
-          </button>
-        )}
+      {/* Catalog Results Summary */}
+      <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+        <div>
+          Affichage de <span className="text-gray-200 font-semibold">{filteredAndSortedAccounts.length}</span> offre{filteredAndSortedAccounts.length > 1 ? 's' : ''} disponible{filteredAndSortedAccounts.length > 1 ? 's' : ''}
+          {selectedFilter !== 'Tous' && <span className="ml-1 text-blue-400">pour {selectedFilter}</span>}
+          {maxPriceFilter > 0 && <span className="ml-1 text-blue-400">({`≤ ${maxPriceFilter.toLocaleString()} FCFA`})</span>}
+        </div>
       </div>
 
       {/* Accounts Grid */}
       {filteredAndSortedAccounts.length > 0 ? (
         <div className="catalog-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 w-full">
           {filteredAndSortedAccounts.map((account, index) => {
-            const cardKey = account.id ? `acc-${account.id}-${index}` : `account-card-${index}`;
+            const cardKey = account.id ? `account-item-${account.id}` : `account-index-${index}`;
             return (
               <AccountCard
                 key={cardKey}
@@ -309,37 +319,39 @@ export const HomeCatalog: React.FC = () => {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 bg-[#16161D] rounded-2xl border border-gray-800 p-8 space-y-3">
-          <div className="w-12 h-12 rounded-full bg-blue-600/10 text-blue-400 flex items-center justify-center mx-auto">
-            <Tag className="w-6 h-6" />
+        /* Empty State */
+        <div className="text-center py-16 px-4 rounded-3xl bg-[#0F0F12] border border-gray-800 space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-gray-800/80 flex items-center justify-center text-gray-500">
+            <Search className="w-8 h-8" />
           </div>
-          <h3 className="text-base font-semibold text-white">
-            {t('noAccountsFound')}
-          </h3>
-          <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            {t('noAccountsFoundDesc')}
-          </p>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-gray-200">
+              {t('emptyAccountsTitle')}
+            </h3>
+            <p className="text-sm text-gray-400 max-w-md mx-auto">
+              {t('emptyAccountsDesc')}
+            </p>
+          </div>
           <button
             onClick={() => {
               setSelectedFilter('Tous');
-              setSearchQuery('');
               setMaxPriceFilter(0);
+              setSearchQuery('');
             }}
-            className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-lg shadow-blue-600/20"
           >
-            Réinitialiser tous les filtres
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Réinitialiser les filtres</span>
           </button>
         </div>
       )}
 
       {/* Account Detail Modal */}
-      {selectedAccount && (
-        <AccountDetailModal
-          account={selectedAccount}
-          isOpen={!!selectedAccount}
-          onClose={() => setSelectedAccount(null)}
-        />
-      )}
+      <AccountDetailModal
+        account={selectedAccount}
+        isOpen={Boolean(selectedAccount)}
+        onClose={() => setSelectedAccount(null)}
+      />
 
     </div>
   );
